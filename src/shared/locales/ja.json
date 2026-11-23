@@ -1,4 +1,17 @@
 {
+  "mediaSelection": {
+    "title": "動画を選択",
+    "selectAll": "すべて選択",
+    "selectNone": "選択を解除",
+    "selected": "{{total}} 件中 {{selected}} 件を選択",
+    "part": "パート {{number}}",
+    "quality": "画質",
+    "download": "選択した動画をダウンロード",
+    "inspectFailed": "動画を読み込めません。再試行してください。",
+    "createFailed": "ダウンロードを作成できません。再試行してください。",
+    "entryFailed": "{{title}}: {{reason}}",
+    "highest": "Highest"
+  },
   "operatorUnlock": {
     "title": "Motrix のロックを解除",
     "help": "このサーバーには管理者トークンが必要です。ホスト上で MOTRIX_OPERATOR_TOKEN を設定するか、<dataDir>/operator-token からトークンを読み取り、以下に貼り付けてください。",
@@ -1592,7 +1605,10 @@
         "magnetFileSelectionAutoDownloadDesc": "以下の時間が経過すると、アプリのウインドウやブラウザーを閉じていても開始します。",
         "magnetFileSelectionTimeoutSeconds": "ファイルを選択する時間（秒）",
         "magnetFileSelectionTimeoutSecondsDesc": "ファイル一覧の準備ができた時点から計測します。変更はすでに待機中のタスクにも適用されます。",
-        "magnetFileSelectionTimeoutInvalid": "{{min}}～{{max}} 秒の整数を入力してください。"
+        "magnetFileSelectionTimeoutInvalid": "{{min}}～{{max}} 秒の整数を入力してください。",
+        "mediaSelectionSkipSingleDialog": "Download single-part media directly",
+        "mediaSelectionSkipSingleDialogDesc": "When enabled, a single part downloads at the chosen quality without opening the picker.",
+        "mediaSelectionHighest": "Highest"
       },
       "seeding": {
         "title": "シード",

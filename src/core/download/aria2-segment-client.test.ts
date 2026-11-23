@@ -79,6 +79,22 @@ describe('Aria2SegmentClient', () => {
     expect(cb2).toHaveBeenCalledWith('gid-99')
   })
 
+  it('unsubscribes completion and error listeners without affecting peers', () => {
+    const { rpc, fireComplete, fireError } = makeFakeRpc()
+    const client = new Aria2SegmentClient(rpc, rpc)
+    const retained = vi.fn()
+    const removed = vi.fn()
+    client.onComplete(retained)
+    const disposeComplete = client.onComplete(removed)
+    const disposeError = client.onError(removed)
+    disposeComplete?.()
+    disposeError?.()
+    fireComplete('gid-1')
+    fireError('gid-1')
+    expect(retained).toHaveBeenCalledWith('gid-1')
+    expect(removed).not.toHaveBeenCalled()
+  })
+
   it('fan-out: two onError subscribers both receive the gid', () => {
     const { rpc, fireError } = makeFakeRpc()
     const client = new Aria2SegmentClient(rpc, rpc)

@@ -1,4 +1,17 @@
 {
+  "mediaSelection": {
+    "title": "Tria vídeos",
+    "selectAll": "Selecciona-ho tot",
+    "selectNone": "Desmarca-ho tot",
+    "selected": "{{selected}} de {{total}} seleccionats",
+    "part": "Part {{number}}",
+    "quality": "Qualitat",
+    "download": "Baixa la selecció",
+    "inspectFailed": "No es poden carregar els vídeos. Torna-ho a provar.",
+    "createFailed": "No es poden crear les baixades. Torna-ho a provar.",
+    "entryFailed": "{{title}}: {{reason}}",
+    "highest": "Highest"
+  },
   "applicationMenu": {
     "actionFailed": "No s'ha pogut completar l'acció. Comproveu la connexió i torneu-ho a provar.",
     "back": "Enrere",
@@ -2024,7 +2037,10 @@
         "magnetFileSelectionTimeoutInvalid": "Introduïu un nombre enter de segons entre {{min}} i {{max}}.",
         "magnetFileSelectionTimeoutSeconds": "Temps per triar els fitxers (s)",
         "magnetFileSelectionTimeoutSecondsDesc": "Comença quan la llista de fitxers està preparada. Els canvis també s'apliquen a les tasques que ja estan esperant.",
-        "title": "Parells"
+        "title": "Parells",
+        "mediaSelectionSkipSingleDialog": "Download single-part media directly",
+        "mediaSelectionSkipSingleDialogDesc": "When enabled, a single part downloads at the chosen quality without opening the picker.",
+        "mediaSelectionHighest": "Highest"
       },
       "seeding": {
         "seedRatio": "Límit de la ràtio de compartició",

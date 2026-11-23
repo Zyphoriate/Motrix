@@ -204,8 +204,8 @@ importers:
         specifier: ^0.1.4
         version: 0.1.4
       '@motrix/plugin-manifest-schema':
-        specifier: ^2.2.0
-        version: 2.2.0
+        specifier: file:vendor/sdk/motrix-plugin-manifest-schema-2.3.0-media.1.tgz
+        version: file:vendor/sdk/motrix-plugin-manifest-schema-2.3.0-media.1.tgz
       '@motrix/torrent':
         specifier: ^0.1.1
         version: 0.1.1
@@ -361,8 +361,8 @@ importers:
         specifier: ^0.5.0
         version: 0.5.0
       '@motrix/plugin-api':
-        specifier: 2.2.0
-        version: 2.2.0
+        specifier: file:vendor/sdk/motrix-plugin-api-2.3.0-media.1.tgz
+        version: file:vendor/sdk/motrix-plugin-api-2.3.0-media.1.tgz
       '@playwright/test':
         specifier: ^1.65.1
         version: 1.65.1
@@ -1084,11 +1084,13 @@ packages:
     resolution: {integrity: sha512-yjJTISVhamjPMRz9Nay4KXAXCuLmDgzwFjs8bNFoD4GnF2gtNAkF2fVecnAIJU2Z48epAHC0FDd/efW3vUoBYA==}
     engines: {node: '>=22'}
 
-  '@motrix/plugin-api@2.2.0':
-    resolution: {integrity: sha512-87gTWZY3k8wAlxQxp4RQ1dZ4Egi9zMoeW1lsPFZeBd6nOsQTn/hWDyJcc3MmRYMv4ZNteb210hTzlzeHCNC7lA==}
+  '@motrix/plugin-api@file:vendor/sdk/motrix-plugin-api-2.3.0-media.1.tgz':
+    resolution: {integrity: sha512-s+VT4pDGvFiqVmfMKnkiYdx65WW79olOqADwHCkCgrfFKPMBvRpdYKOawzTgtpF2PhjmCdWUsBGoO1i9sqwRww==, tarball: file:vendor/sdk/motrix-plugin-api-2.3.0-media.1.tgz}
+    version: 2.3.0-media.1
 
-  '@motrix/plugin-manifest-schema@2.2.0':
-    resolution: {integrity: sha512-lR1D7+AHM6ElzaP5BvCgVkxL5WXmU3v/WO0GwGs2bP8+axm5PK8jnxzd+JlgGja3/b1nl+lCSksf6G9VOyVc+w==}
+  '@motrix/plugin-manifest-schema@file:vendor/sdk/motrix-plugin-manifest-schema-2.3.0-media.1.tgz':
+    resolution: {integrity: sha512-dVDfQBbMYodocBmHkKOVD+a8l6HXVRpSC2wKTKFPacTgV8gy8GifrqHVZTUVJXCcUQq9Afd180OKhtLoGop+mQ==, tarball: file:vendor/sdk/motrix-plugin-manifest-schema-2.3.0-media.1.tgz}
+    version: 2.3.0-media.1
 
   '@motrix/torrent@0.1.1':
     resolution: {integrity: sha512-ab9Et5ZH+8KnkGFAO5tl1PdRm51k6UzGNm90Hj1OCjBVeWXv4EKg4EBgrbzLoV1Lmjbyw3BTLwaGfvzGTZAmFA==}
@@ -5026,9 +5028,9 @@ snapshots:
 
   '@motrix/nat@0.1.4': {}
 
-  '@motrix/plugin-api@2.2.0': {}
+  '@motrix/plugin-api@file:vendor/sdk/motrix-plugin-api-2.3.0-media.1.tgz': {}
 
-  '@motrix/plugin-manifest-schema@2.2.0':
+  '@motrix/plugin-manifest-schema@file:vendor/sdk/motrix-plugin-manifest-schema-2.3.0-media.1.tgz':
     dependencies:
       zod: 4.6.7
 

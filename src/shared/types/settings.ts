@@ -265,6 +265,8 @@ export interface MotrixAppSettings {
   magnetFileSelection: boolean
   magnetFileSelectionAutoDownload: boolean
   magnetFileSelectionTimeoutSeconds: number
+  /** Submit a single inspected media entry without showing the picker. */
+  mediaSelectionSkipSingleDialog: boolean
   /** Master switch for the WebSocket bridge that lets browser extensions
    *  hand downloads to Motrix. Default true. Changing requires app restart. */
   browserBridgeEnabled: boolean

@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { rendererGenerationSchema } from './renderer-health'
 export const rendererSubmissionChannelSchema = z.enum([
   Commands.CreateTask,
+  Commands.CreatePluginMediaTasks,
   Commands.NextTorrent,
   Commands.DownloadAllTorrents,
 ])

@@ -1,4 +1,17 @@
 {
+  "mediaSelection": {
+    "title": "Επιλογή βίντεο",
+    "selectAll": "Επιλογή όλων",
+    "selectNone": "Αποεπιλογή όλων",
+    "selected": "Επιλέχθηκαν {{selected}} από {{total}}",
+    "part": "Μέρος {{number}}",
+    "quality": "Ποιότητα",
+    "download": "Λήψη επιλεγμένων",
+    "inspectFailed": "Αδυναμία φόρτωσης βίντεο. Δοκιμάστε ξανά.",
+    "createFailed": "Αδυναμία δημιουργίας λήψεων. Δοκιμάστε ξανά.",
+    "entryFailed": "{{title}}: {{reason}}",
+    "highest": "Highest"
+  },
   "applicationMenu": {
     "actionFailed": "Δεν ήταν δυνατή η ολοκλήρωση της ενέργειας. Ελέγξτε τη σύνδεση και δοκιμάστε ξανά.",
     "back": "Πίσω",
@@ -2005,7 +2018,10 @@
         "magnetFileSelectionTimeoutInvalid": "Εισαγάγετε έναν ακέραιο αριθμό από {{min}} έως {{max}} δευτερόλεπτα.",
         "magnetFileSelectionTimeoutSeconds": "Χρόνος επιλογής αρχείων (δευτ.)",
         "magnetFileSelectionTimeoutSecondsDesc": "Ξεκινά όταν η λίστα αρχείων είναι έτοιμη. Οι αλλαγές ισχύουν και για τις εργασίες που ήδη περιμένουν.",
-        "title": "Ομότιμοι"
+        "title": "Ομότιμοι",
+        "mediaSelectionSkipSingleDialog": "Download single-part media directly",
+        "mediaSelectionSkipSingleDialogDesc": "When enabled, a single part downloads at the chosen quality without opening the picker.",
+        "mediaSelectionHighest": "Highest"
       },
       "seeding": {
         "seedRatio": "Όριο αναλογίας διαμοιρασμού",

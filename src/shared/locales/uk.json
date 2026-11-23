@@ -1,4 +1,17 @@
 {
+  "mediaSelection": {
+    "title": "Виберіть відео",
+    "selectAll": "Вибрати все",
+    "selectNone": "Скасувати вибір",
+    "selected": "Вибрано {{selected}} з {{total}}",
+    "part": "Частина {{number}}",
+    "quality": "Якість",
+    "download": "Завантажити вибране",
+    "inspectFailed": "Не вдалося завантажити відео. Спробуйте ще раз.",
+    "createFailed": "Не вдалося створити завантаження. Спробуйте ще раз.",
+    "entryFailed": "{{title}}: {{reason}}",
+    "highest": "Highest"
+  },
   "applicationMenu": {
     "actionFailed": "Не вдалося виконати дію. Перевірте з’єднання та спробуйте ще раз.",
     "back": "Назад",
@@ -2043,7 +2056,10 @@
         "magnetFileSelectionTimeoutInvalid": "Введіть ціле число від {{min}} до {{max}} секунд.",
         "magnetFileSelectionTimeoutSeconds": "Час для вибору файлів (с)",
         "magnetFileSelectionTimeoutSecondsDesc": "Відлік починається, коли список файлів готовий. Зміни також застосовуються до завдань, які вже очікують.",
-        "title": "Піри"
+        "title": "Піри",
+        "mediaSelectionSkipSingleDialog": "Download single-part media directly",
+        "mediaSelectionSkipSingleDialogDesc": "When enabled, a single part downloads at the chosen quality without opening the picker.",
+        "mediaSelectionHighest": "Highest"
       },
       "seeding": {
         "seedRatio": "Граничний коефіцієнт обміну",

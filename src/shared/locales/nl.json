@@ -1,4 +1,17 @@
 {
+  "mediaSelection": {
+    "title": "Video’s kiezen",
+    "selectAll": "Alles selecteren",
+    "selectNone": "Niets selecteren",
+    "selected": "{{selected}} van {{total}} geselecteerd",
+    "part": "Deel {{number}}",
+    "quality": "Kwaliteit",
+    "download": "Selectie downloaden",
+    "inspectFailed": "Video’s laden mislukt. Probeer opnieuw.",
+    "createFailed": "Downloads maken mislukt. Probeer opnieuw.",
+    "entryFailed": "{{title}}: {{reason}}",
+    "highest": "Highest"
+  },
   "applicationMenu": {
     "actionFailed": "De actie kon niet worden voltooid. Controleer de verbinding en probeer het opnieuw.",
     "back": "Terug",
@@ -2005,7 +2018,10 @@
         "magnetFileSelectionTimeoutInvalid": "Voer een geheel getal van {{min}} tot {{max}} seconden in.",
         "magnetFileSelectionTimeoutSeconds": "Tijd om bestanden te kiezen (s)",
         "magnetFileSelectionTimeoutSecondsDesc": "Begint zodra de bestandslijst gereed is. Wijzigingen gelden ook voor taken die al wachten.",
-        "title": "Peers"
+        "title": "Peers",
+        "mediaSelectionSkipSingleDialog": "Download single-part media directly",
+        "mediaSelectionSkipSingleDialogDesc": "When enabled, a single part downloads at the chosen quality without opening the picker.",
+        "mediaSelectionHighest": "Highest"
       },
       "seeding": {
         "seedRatio": "Limiet voor deelverhouding",

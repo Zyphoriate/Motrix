@@ -1,4 +1,17 @@
 {
+  "mediaSelection": {
+    "title": "Videók kiválasztása",
+    "selectAll": "Összes kijelölése",
+    "selectNone": "Kijelölés törlése",
+    "selected": "{{selected}} / {{total}} kijelölve",
+    "part": "{{number}}. rész",
+    "quality": "Minőség",
+    "download": "Kijelöltek letöltése",
+    "inspectFailed": "A videók nem tölthetők be. Próbálja újra.",
+    "createFailed": "A letöltések nem hozhatók létre. Próbálja újra.",
+    "entryFailed": "{{title}}: {{reason}}",
+    "highest": "Highest"
+  },
   "operatorUnlock": {
     "title": "Motrix feloldása",
     "help": "Ez a szerver üzemeltetői tokent kér. A szervert futtató gépen állítsd be a MOTRIX_OPERATOR_TOKEN környezeti változót, vagy másold ki a tokent a <dataDir>/operator-token fájlból, majd illeszd be alább.",
@@ -1606,7 +1619,10 @@
         "magnetFileSelectionAutoDownloadDesc": "Az alábbi idő elteltével elindul, akkor is, ha az alkalmazás ablaka vagy a böngésző be van zárva.",
         "magnetFileSelectionTimeoutSeconds": "Fájlkiválasztásra rendelkezésre álló idő (mp)",
         "magnetFileSelectionTimeoutSecondsDesc": "Az időszámítás a fájllista elkészültekor indul. A módosítás a már várakozó feladatokra is érvényes.",
-        "magnetFileSelectionTimeoutInvalid": "Adj meg egy {{min}} és {{max}} másodperc közötti egész számot."
+        "magnetFileSelectionTimeoutInvalid": "Adj meg egy {{min}} és {{max}} másodperc közötti egész számot.",
+        "mediaSelectionSkipSingleDialog": "Download single-part media directly",
+        "mediaSelectionSkipSingleDialogDesc": "When enabled, a single part downloads at the chosen quality without opening the picker.",
+        "mediaSelectionHighest": "Highest"
       },
       "seeding": {
         "title": "Visszaosztás",

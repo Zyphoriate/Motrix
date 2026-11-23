@@ -1,4 +1,17 @@
 {
+  "mediaSelection": {
+    "title": "انتخاب ویدیوها",
+    "selectAll": "انتخاب همه",
+    "selectNone": "لغو انتخاب همه",
+    "selected": "{{selected}} از {{total}} انتخاب شده",
+    "part": "بخش {{number}}",
+    "quality": "کیفیت",
+    "download": "بارگیری انتخاب‌شده‌ها",
+    "inspectFailed": "بارگذاری ویدیوها ممکن نیست. دوباره تلاش کنید.",
+    "createFailed": "ایجاد بارگیری‌ها ممکن نیست. دوباره تلاش کنید.",
+    "entryFailed": "{{title}}: {{reason}}",
+    "highest": "Highest"
+  },
   "applicationMenu": {
     "actionFailed": "انجام این کار ممکن نشد. اتصال را بررسی کنید و دوباره تلاش کنید.",
     "back": "بازگشت",
@@ -2005,7 +2018,10 @@
         "magnetFileSelectionTimeoutInvalid": "عدد صحیحی از {{min}} تا {{max}} ثانیه وارد کنید.",
         "magnetFileSelectionTimeoutSeconds": "مهلت انتخاب فایل‌ها (ثانیه)",
         "magnetFileSelectionTimeoutSecondsDesc": "از آماده شدن فهرست فایل‌ها شروع می‌شود. تغییرات بر کارهایی که از قبل منتظرند نیز اعمال می‌شوند.",
-        "title": "همتاها"
+        "title": "همتاها",
+        "mediaSelectionSkipSingleDialog": "Download single-part media directly",
+        "mediaSelectionSkipSingleDialogDesc": "When enabled, a single part downloads at the chosen quality without opening the picker.",
+        "mediaSelectionHighest": "Highest"
       },
       "seeding": {
         "seedRatio": "حد نسبت اشتراک‌گذاری",

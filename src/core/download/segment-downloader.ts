@@ -41,7 +41,7 @@ export interface SegmentAria2 {
   tellStatus(
     gid: string
   ): Promise<{ completedLength: number; totalLength: number } | null>
-  onComplete(cb: (gid: string) => void): void
+  onComplete(cb: (gid: string) => void): void | (() => void)
   /**
    * Register a single callback to receive error notifications.
    * Important: onComplete and onError register a SINGLE callback each.
@@ -50,7 +50,7 @@ export interface SegmentAria2 {
    * overwrite the callbacks. The adapter wiring (bootstrap) is responsible
    * for fan-out and filtering by gid.
    */
-  onError(cb: (gid: string) => void): void
+  onError(cb: (gid: string) => void): void | (() => void)
 }
 
 /** Byte-accurate progress emitted by {@link SegmentDownloader.run}. */
@@ -285,6 +285,7 @@ export class SegmentDownloader {
     for (const job of jobs) recordSize(job, job.part.byteRange?.length ?? 0)
     const safeBytes = (value: number) =>
       Number.isFinite(value) ? Math.max(0, value) : 0
+    const unsubscribers: Array<() => void> = []
     return new Promise<{ initPath?: string; partPaths: string[] }>(
       (resolve, reject) => {
         if (total === 0) {
@@ -340,7 +341,8 @@ export class SegmentDownloader {
         }
 
         // Register callbacks once
-        this.aria2.onComplete((gid) => {
+        const unsubscribeComplete = this.aria2.onComplete((gid) => {
+          if (this.activeJobs.size === 0 && !this.rejectRun) return
           const job = this.activeJobs.get(gid)
           if (!job) return
           this.activeJobs.delete(gid)
@@ -382,7 +384,9 @@ export class SegmentDownloader {
           this.trackOperation(operation)
         })
 
-        this.aria2.onError((gid) => {
+        if (unsubscribeComplete) unsubscribers.push(unsubscribeComplete)
+        const unsubscribeError = this.aria2.onError((gid) => {
+          if (this.activeJobs.size === 0 && !this.rejectRun) return
           const job = this.activeJobs.get(gid)
           if (!job) return
           this.activeJobs.delete(gid)
@@ -417,6 +421,8 @@ export class SegmentDownloader {
           })().catch((err: Error) => fail(err))
           this.trackOperation(operation)
         })
+
+        if (unsubscribeError) unsubscribers.push(unsubscribeError)
 
         // ── Byte poll ────────────────────────────────────────────────────
         // Refresh the live-byte cache for every in-flight gid, then report.
@@ -526,7 +532,9 @@ export class SegmentDownloader {
         this.stopPoll = this.pollScheduler(pollOnce)
         drain()
       }
-    )
+    ).finally(() => {
+      for (const unsubscribe of unsubscribers) unsubscribe()
+    })
   }
 
   async cancel(): Promise<void> {

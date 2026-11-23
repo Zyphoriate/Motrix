@@ -411,6 +411,7 @@ export async function syncNativeMessagingManifests(args: {
 }
 
 export async function bootstrapBridge(args: {
+  mediaRuntime?: import('@core/bridge-receiver/media-task-runtime').MediaTaskRuntime
   extensionHandoff?: ExtensionHandoffModule
   getMainWindow: () => Electron.BrowserWindow | null
   motrixVersion: string
@@ -608,6 +609,7 @@ export async function bootstrapBridge(args: {
       args.pluginHost
     )
     const receiver = new BridgeReceiver({
+      mediaRuntime: args.mediaRuntime,
       mediaMetaStore: args.mediaMetaStore,
       getDefaultSaveDir: args.getDefaultSaveDir,
       resolveSaveDir: args.resolveSaveDir,

@@ -38,6 +38,24 @@ function makeAdaptedMux(overrides: Partial<AdaptedMux> = {}): AdaptedMux {
 // ---------------------------------------------------------------------------
 
 describe('MuxPipeline', () => {
+  it('keeps video and audio authentication headers separate for the shared coordinator', async () => {
+    const coordinator = {
+      submit: vi.fn(async (job: MediaJob) => ({ taskId: job.taskId ?? 'gen' })),
+    }
+    await new MuxPipeline({ coordinator }).dispatch(
+      makeAdaptedMux({
+        videoHeaders: { Referer: 'https://video.example/' },
+        audioHeaders: { Authorization: 'Bearer audio' },
+      })
+    )
+    expect(coordinator.submit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        videoHeaders: { Referer: 'https://video.example/' },
+        audioHeaders: { Authorization: 'Bearer audio' },
+      })
+    )
+  })
+
   it('builds two single-part SegmentPlans and calls coordinator.submit with video + audio', async () => {
     const captured: MediaJob[] = []
     const coordinator = {

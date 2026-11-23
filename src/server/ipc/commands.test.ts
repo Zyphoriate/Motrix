@@ -2,6 +2,7 @@ import { mkdir, mkdtemp, realpath, rm, symlink } from 'node:fs/promises'
 import os from 'node:os'
 import path from 'node:path'
 import { NOOP_TASK_ACTIVITY_RECORDER } from '@core/activity'
+import type { MediaTaskRuntime } from '@core/bridge-receiver/media-task-runtime'
 import type { Aria2RpcClient } from '@core/engine/aria2/aria2-rpc-client'
 import type { EngineAdapter } from '@core/engine/engine-adapter'
 import type { EngineSupervisor } from '@core/engine/engine-supervisor'
@@ -18,6 +19,7 @@ import type { RegistryClient } from '@core/plugin/registry/registry-client'
 import type { PluginStateStore } from '@core/plugin/state/plugin-state-store'
 import { AppliedDownloadProxyPolicy } from '@core/proxy/applied-download-proxy-policy'
 import { MotrixDatabase } from '@core/session/motrix-database'
+import type { SessionManager } from '@core/session/session-manager'
 import { SettingsManager } from '@core/settings/settings-manager'
 import type { FileCleanupService } from '@core/task/file-cleanup-service'
 import type { FinalNamePicker } from '@core/task/final-name-picker'
@@ -25,6 +27,7 @@ import { TaskManager } from '@core/task/task-manager'
 import type { TorrentMetaStore } from '@core/task/torrent-meta-store'
 import type { MagnetTracker } from '@core/torrent/magnet-tracker'
 import type { TrackerManager } from '@core/tracker'
+import { AppError, ErrorCode } from '@shared/errors'
 import { Commands } from '@shared/protocol/commands'
 import { Events } from '@shared/protocol/events'
 import { Queries } from '@shared/protocol/queries'
@@ -86,6 +89,7 @@ function makeFakeCtx() {
     supervisor: {
       stop: vi.fn().mockResolvedValue(undefined),
       start: vi.fn().mockResolvedValue(undefined),
+      restart: vi.fn().mockResolvedValue(undefined),
       applyEngineSettings: vi.fn().mockResolvedValue(undefined),
       applyAsyncDns: vi.fn().mockResolvedValue(undefined),
       applyDefaultSaveDir: vi.fn().mockResolvedValue(undefined),
@@ -150,8 +154,8 @@ function makeFakeCtx() {
     } as unknown as NotificationCenter,
     taskPersistence: {
       runExclusivePersistence: vi.fn(
-        async (operation: () => unknown | Promise<unknown>) => operation()
-      ),
+        async (operation: () => unknown): Promise<unknown> => operation()
+      ) as unknown as SessionManager['runExclusivePersistence'],
     },
     pluginRegistry: {
       refreshState,
@@ -218,7 +222,7 @@ function makeFakeCtx() {
     runTaskMutation: vi.fn(
       async (_taskIds: readonly string[], operation: () => Promise<unknown>) =>
         operation()
-    ),
+    ) as unknown as ServerCommandContext['runTaskMutation'],
     downloadPathPolicy: {
       allowedSaveDirs: ['/downloads'],
       prepareSaveDir: vi.fn(async (requested: string) => requested),
@@ -230,6 +234,167 @@ function makeFakeCtx() {
     },
   }
 }
+
+describe('server plugin media selections without extension integration', () => {
+  function setup() {
+    const ctx = makeFakeCtx()
+    const pluginId = 'community.media-resolver'
+    const source = 'https://www.bilibili.com/video/BV1GJ411x7h7'
+    const collection = {
+      schemaVersion: 1,
+      title: 'Video',
+      entries: [
+        {
+          id: 'part-2',
+          title: 'Video - P2 Second',
+          url: `${source}?p=2`,
+          partNumber: 2,
+        },
+      ],
+      qualities: ['1080p', '720p', '480p'],
+      defaultQuality: '1080p',
+    }
+    const invokeCommand = vi.fn(async (_pluginId: string, command: string) =>
+      command.endsWith('.inspectMedia')
+        ? collection
+        : {
+            kind: 'mux',
+            container: 'mp4',
+            title: 'Video - P2 Second',
+            video: {
+              url: 'https://video.example/video.m4s',
+              headers: { Referer: source },
+            },
+            audio: {
+              url: 'https://audio.example/audio.m4s',
+              headers: { Authorization: 'Bearer audio' },
+            },
+          }
+    )
+    ctx.pluginRegistry = {
+      entries: () => [
+        {
+          enabled: true,
+          executableDigest: 'v1',
+          origin: 'community',
+          manifest: {
+            id: pluginId,
+            categories: ['site-resolver'],
+            hostPermissions: ['https://*.bilibili.com/*'],
+            contributes: {
+              commands: [
+                { id: `${pluginId}.inspectMedia`, public: true },
+                { id: `${pluginId}.resolve`, public: true },
+              ],
+            },
+          },
+        },
+      ],
+      policySnapshot: () => ({
+        enabled: true,
+        generation: 1,
+        executableDigest: 'v1',
+      }),
+    } as unknown as PluginRegistry
+    ctx.pluginHost = {
+      activate: vi.fn(),
+      invokeCommand,
+    } as unknown as PluginHost
+    ctx.taskManager = new TaskManager()
+    ctx.finalNamePicker = {
+      pick: vi.fn(async (_dir: string, desired: string) => desired),
+    } as unknown as FinalNamePicker
+    const dispatch = vi.fn(async (adapted: { taskId: string }) => ({
+      taskId: adapted.taskId,
+    }))
+    const mediaRuntime = {
+      muxPipeline: { dispatch },
+    } as unknown as MediaTaskRuntime
+    const handlers = buildServerCommandHandlers({ ...ctx, mediaRuntime })
+    return { ctx, handlers, dispatch, invokeCommand, source, pluginId }
+  }
+
+  it('inspects then resolves a selected part into the shared mux pipeline using the directory policy', async () => {
+    const h = setup()
+    const prepare = vi.mocked(h.ctx.downloadPathPolicy.prepareSaveDir)
+    prepare.mockResolvedValue('/tmp')
+    const preview = (await h.handlers[Commands.InspectPluginMedia]!({
+      url: h.source,
+    })) as { selectionId: string }
+    expect(h.dispatch).not.toHaveBeenCalled()
+    const result = await h.handlers[Commands.CreatePluginMediaTasks]!({
+      selectionId: preview.selectionId,
+      entryIds: ['part-2'],
+      quality: '1080p',
+      saveDir: '/requested',
+      connections: 8,
+    })
+    expect(prepare).toHaveBeenCalledWith('/requested')
+    expect(h.invokeCommand).toHaveBeenLastCalledWith(
+      h.pluginId,
+      `${h.pluginId}.resolve`,
+      { url: `${h.source}?p=2`, quality: '1080p' }
+    )
+    expect(h.dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        saveDir: '/tmp',
+        finalName: 'Video - P2 Second.mp4',
+        videoHeaders: { Referer: h.source },
+        audioHeaders: { Authorization: 'Bearer audio' },
+      })
+    )
+    expect(result).toEqual({
+      created: [{ entryId: 'part-2', taskId: expect.any(String) }],
+      failed: [],
+    })
+    expect(h.ctx.bridgeControl.setEnabled).not.toHaveBeenCalled()
+  })
+
+  it('reports directory denial without invoking the mux pipeline', async () => {
+    const h = setup()
+    // DirectoryAuthorizationError from the server policy is user-facing and
+    // carries a directoryCode on the AppError instance.
+    const denial = new AppError(ErrorCode.TaskCreateFailed, 'directory denied')
+    ;(denial as { directoryCode?: string }).directoryCode = 'outsideRoots'
+    vi.mocked(h.ctx.downloadPathPolicy.prepareSaveDir).mockRejectedValue(denial)
+    const preview = (await h.handlers[Commands.InspectPluginMedia]!({
+      url: h.source,
+    })) as { selectionId: string }
+    expect(
+      await h.handlers[Commands.CreatePluginMediaTasks]!({
+        selectionId: preview.selectionId,
+        entryIds: ['part-2'],
+        quality: '720p',
+        saveDir: '/forbidden',
+      })
+    ).toEqual({
+      created: [],
+      failed: [{ entryId: 'part-2', message: 'directory denied' }],
+    })
+    expect(h.dispatch).not.toHaveBeenCalled()
+  })
+})
+
+it('drains active media before manually restarting the server engine', async () => {
+  const ctx = makeFakeCtx()
+  const { promise: mediaDrained, resolve: finishDrain } =
+    Promise.withResolvers<void>()
+  const cancelActiveAndDrain = vi.fn(async (restart: () => Promise<void>) => {
+    await mediaDrained
+    await restart()
+  })
+  const handlers = buildServerCommandHandlers({
+    ...(ctx as unknown as ServerCommandContext),
+    mediaRuntime: { cancelActiveAndDrain } as unknown as MediaTaskRuntime,
+  })
+
+  const restarted = handlers[Commands.RestartEngine]!()
+  expect(cancelActiveAndDrain).toHaveBeenCalledOnce()
+  expect(ctx.supervisor.restart).not.toHaveBeenCalled()
+  finishDrain()
+  await expect(restarted).resolves.toEqual({ ok: true })
+  expect(ctx.supervisor.restart).toHaveBeenCalledOnce()
+})
 
 describe('server application update checks', () => {
   it('applies the persisted channel to subsequent version checks', async () => {

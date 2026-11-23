@@ -12,6 +12,7 @@ import { makeMediaMetaStoreStub } from '@test-utils/media-meta-store'
 import { makeDownloadTask } from '@test-utils/task'
 import { describe, expect, it, vi } from 'vitest'
 import { BridgeReceiver } from './bridge-receiver'
+import { MediaTaskRuntime } from './media-task-runtime'
 
 /** Minimal fake SegmentAria2 — never actually called in routing tests. */
 const fakeSegmentAria2: SegmentAria2 = {
@@ -58,6 +59,37 @@ function fakeDeps(
 }
 
 describe('BridgeReceiver', () => {
+  it('shares host media ownership across listener restart and keeps explicit cancel available', async () => {
+    const deps = fakeDeps({ ffmpegBinaryPath: '/usr/bin/ffmpeg' })
+    const runtime = new MediaTaskRuntime(deps as never)
+    const drain = vi.spyOn(runtime.coordinator, 'stopAndDrain')
+    const cancel = vi.spyOn(runtime.coordinator, 'cancel')
+    const gids = vi
+      .spyOn(runtime.coordinator, 'getActiveSegmentGids')
+      .mockReturnValue(['video-gid', 'audio-gid'])
+    const first = new BridgeReceiver({
+      ...deps,
+      mediaRuntime: runtime,
+    } as never)
+    expect(first.muxPipeline).toBe(runtime.muxPipeline)
+    expect(first.getMediaSegmentGids('selected-media')).toEqual([
+      'video-gid',
+      'audio-gid',
+    ])
+    expect(gids).toHaveBeenCalledWith('selected-media')
+    await first.stopAndDrain()
+    expect(drain).not.toHaveBeenCalled()
+    const restarted = new BridgeReceiver({
+      ...deps,
+      mediaRuntime: runtime,
+    } as never)
+    expect(restarted.muxPipeline).toBe(first.muxPipeline)
+    await restarted.cancelMedia('selected-media')
+    expect(cancel).toHaveBeenCalledWith('selected-media')
+    await runtime.stopAndDrain()
+    expect(drain).toHaveBeenCalledTimes(1)
+  })
+
   it('handle: direct submit returns taskId and calls createTask', async () => {
     const deps = fakeDeps()
     const r = new BridgeReceiver(deps as never)

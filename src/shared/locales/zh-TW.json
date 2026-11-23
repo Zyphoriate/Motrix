@@ -1,4 +1,17 @@
 {
+  "mediaSelection": {
+    "title": "選擇影片",
+    "selectAll": "全選",
+    "selectNone": "取消全選",
+    "selected": "已選擇 {{selected}} / {{total}} 項",
+    "part": "第 {{number}} P",
+    "quality": "畫質",
+    "download": "下載所選影片",
+    "inspectFailed": "無法載入影片，請重試。",
+    "createFailed": "無法建立下載任務，請重試。",
+    "entryFailed": "{{title}}：{{reason}}",
+    "highest": "Highest"
+  },
   "operatorUnlock": {
     "title": "登入 Motrix",
     "help": "首次登入或忘記密碼時，請向伺服器管理員取得存取密碼。",
@@ -1592,6 +1605,9 @@
         "magnetFileSelectionAutoDownloadDesc": "超過下方等候時間後開始下載；關閉視窗或瀏覽器後仍會生效。",
         "magnetFileSelectionTimeoutSeconds": "選擇檔案等候時間（秒）",
         "magnetFileSelectionTimeoutSecondsDesc": "從檔案清單載入完成時計時，也適用於正在等候的任務。",
+        "mediaSelectionSkipSingleDialog": "單P直接下載",
+        "mediaSelectionSkipSingleDialogDesc": "開啟後，只有一個分P時直接按所選畫質下載，不顯示選擇視窗。",
+        "mediaSelectionHighest": "最高",
         "magnetFileSelectionTimeoutInvalid": "請輸入 {{min}} 至 {{max}} 秒之間的整數。"
       },
       "seeding": {

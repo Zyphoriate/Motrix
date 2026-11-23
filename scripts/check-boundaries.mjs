@@ -54,6 +54,9 @@ const rules = [
       'add-task-form.tsx',
       // The form's integration tests assert its IPC contract.
       'add-task-form.test.tsx',
+      // The media-selection hook owns the inspect/confirm IPC boundary.
+      'use-media-selection.tsx',
+      'media-selection.test.tsx',
     ],
   },
   {

@@ -1,6 +1,7 @@
 import { realpath } from 'node:fs/promises'
 import path from 'node:path'
 import { BridgeReceiverError } from '@core/bridge-receiver/errors'
+import type { MediaTaskRuntime } from '@core/bridge-receiver/media-task-runtime'
 import type { AdaptedMux } from '@core/bridge-receiver/submit-download-adapter'
 import type { DnsFallbackConsumer } from '@core/engine/aria2/dns-fallback'
 import { dnsModeToAsyncDns } from '@core/engine/aria2/dns-fallback'
@@ -11,6 +12,7 @@ import type { EventBus } from '@core/events/event-bus'
 import type { GeoIPManager } from '@core/geoip/geo-ip-manager'
 import { createUpdateGeoIPDatabaseHandler } from '@core/geoip/update-geo-ip-database'
 import { getLogger } from '@core/logger'
+import { dispatchPluginMediaTask } from '@core/media/plugin-media-dispatch'
 import { publishEngineRestartRequired } from '@core/notifications/engine-restart-required'
 import type { NotificationCenter } from '@core/notifications/notification-center'
 import type { CapabilityHost } from '@core/plugin/capabilities/interface'
@@ -31,6 +33,7 @@ import {
 import type { SourceInput } from '@core/plugin/install/source-resolver'
 import { downloadUrlMoext } from '@core/plugin/install/url-fetcher'
 import { PluginEngineVersionTooOld } from '@core/plugin/manifest/errors'
+import { PluginMediaSelectionService } from '@core/plugin/media-selection-service'
 import { PluginNetworkError } from '@core/plugin/network/plugin-network-error'
 import type { OperationService } from '@core/plugin/operations/operation-service'
 import type { PluginRegistry } from '@core/plugin/plugin-registry'
@@ -191,6 +194,7 @@ const cliInstallRequestSchema = z
   .strict()
 
 export interface CommandContext {
+  mediaRuntime?: MediaTaskRuntime
   btStorageRuntime?: Pick<
     DurableFinalizeRuntime,
     'commit' | 'withArtifactLease' | 'hasPendingFinalization'
@@ -412,7 +416,8 @@ export function buildCommandHandlers(ctx: CommandContext): CommandHandlerMap {
       bridgeManager.current?.resolveToMux(url) ?? Promise.resolve(null),
     // Share the receiver's live FFmpeg check with desktop submissions.
     dispatchMux: async (adapted: AdaptedMux) => {
-      const mux = bridgeManager.current?.muxPipeline
+      const mux =
+        ctx.mediaRuntime?.muxPipeline ?? bridgeManager.current?.muxPipeline
       if (!mux) {
         throw new AppError(
           ErrorCode.EngineFeatureUnavailable,
@@ -436,13 +441,19 @@ export function buildCommandHandlers(ctx: CommandContext): CommandHandlerMap {
     },
   }
 
-  // Lazy closure over bridgeManager.current, mirroring resolveToMux/dispatchMux:
-  // a media task (Mux/Hls) has engineTaskId '' and no aria2 handle, so pause/
-  // resume act on the coordinator's live segment gids instead. Returns [] when
-  // the bridge/coordinator is absent — pause/resume then reports a clear
-  // "can't be paused" error rather than crashing on an empty gid.
+  // A media task (Mux/Hls) has engineTaskId '' and no aria2 handle, so pause/
+  // resume act on the host coordinator's live segment gids. The bridge fallback
+  // supports callers that still assemble commands with a receiver-owned runtime.
   const getMediaSegmentGids = (taskId: string): string[] =>
-    bridgeManager.current?.getMediaSegmentGids(taskId) ?? []
+    ctx.mediaRuntime?.getMediaSegmentGids(taskId) ??
+    bridgeManager.current?.getMediaSegmentGids(taskId) ??
+    []
+
+  const mediaSelection = new PluginMediaSelectionService({
+    registry: pluginRegistry,
+    host: pluginHost,
+    createTask: (input) => dispatchPluginMediaTask(input, createDeps),
+  })
 
   const log = getLogger('commands')
 
@@ -553,7 +564,9 @@ export function buildCommandHandlers(ctx: CommandContext): CommandHandlerMap {
     // Tear down the coordinator run for a media task (engineTaskId '') so
     // removing it never orphans the segment downloaders + ffmpeg.
     cancelMedia: (id: string) =>
-      bridgeManager.current?.cancelMedia(id) ?? Promise.resolve(),
+      ctx.mediaRuntime?.cancelMedia(id) ??
+      bridgeManager.current?.cancelMedia(id) ??
+      Promise.resolve(),
     deleteParentTasks,
     runTaskMutation,
   }
@@ -803,6 +816,11 @@ export function buildCommandHandlers(ctx: CommandContext): CommandHandlerMap {
         saveDir: params.saveDir || settingsManager.getApp().defaultSaveDir,
       })
     },
+
+    [Commands.InspectPluginMedia]: (request: unknown) =>
+      mediaSelection.inspect(request),
+    [Commands.CreatePluginMediaTasks]: (request: unknown) =>
+      mediaSelection.create(request),
 
     [Commands.AddMagnetTask]: async (params: {
       uri: string

@@ -74,6 +74,8 @@ export interface AdaptedMux {
   finalName: string
   videoUrl: string
   audioUrl: string
+  videoHeaders?: Record<string, string>
+  audioHeaders?: Record<string, string>
   sanitizedHeaders: Record<string, string>
   container: 'mp4' | 'mkv'
   /** BridgeSourceMeta for bridge-originated mux tasks; null for desktop

@@ -1,4 +1,6 @@
 export const Commands = {
+  InspectPluginMedia: 'command:inspectPluginMedia',
+  CreatePluginMediaTasks: 'command:createPluginMediaTasks',
   SaveNasSettings: 'command:saveNasSettings',
   AcknowledgeGraphicsRecoveryNotice:
     'command:acknowledgeGraphicsRecoveryNotice',

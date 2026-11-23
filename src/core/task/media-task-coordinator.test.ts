@@ -665,6 +665,73 @@ describe('MediaTaskCoordinator.start', () => {
     await expect(coordinator.submit(baseJob())).rejects.toThrow(/stopped/)
   })
 
+  it('cancels active transfers before restart and accepts new media after it', async () => {
+    const firstDownloader = makeDownloaderFake({ hang: true })
+    const secondDownloader = makeDownloaderFake()
+    const { promise: restartDone, resolve: finishRestart } =
+      Promise.withResolvers<void>()
+    const { deps, taskManager } = makeDeps({
+      makeDownloader: vi
+        .fn()
+        .mockReturnValueOnce(firstDownloader)
+        .mockReturnValue(secondDownloader),
+    })
+    const coordinator = new MediaTaskCoordinator(deps)
+    const { taskId } = await coordinator.submit(baseJob())
+    const restart = vi.fn(() => restartDone)
+
+    const drained = coordinator.cancelActiveAndDrain(restart)
+    expect(coordinator.cancelActiveAndDrain(restart)).toBe(drained)
+    try {
+      await vi.waitFor(() => expect(restart).toHaveBeenCalledOnce())
+      expect(firstDownloader.cancel).toHaveBeenCalledOnce()
+      expect(taskManager.getById(taskId)).toMatchObject({
+        status: TaskStatus.Error,
+        errorMessage: 'mux-aborted',
+      })
+      await expect(coordinator.submit(baseJob())).rejects.toThrow(
+        /engine restart/
+      )
+    } finally {
+      finishRestart()
+      await drained
+    }
+
+    await coordinator.submit({ ...baseJob(), taskId: 'after-restart' })
+    await vi.waitFor(() =>
+      expect(taskManager.getById('after-restart')?.status).toBe(
+        TaskStatus.Completed
+      )
+    )
+    await coordinator.stopAndDrain()
+  })
+
+  it('drains media registration already in progress before restarting', async () => {
+    const registering = Promise.withResolvers<void>()
+    const releaseRegistration = Promise.withResolvers<void>()
+    const { deps, taskManager, downloaderFakes } = makeDeps({
+      parentTaskCreated: async (_task, persist) => {
+        registering.resolve()
+        await releaseRegistration.promise
+        await persist()
+      },
+    })
+    const coordinator = new MediaTaskCoordinator(deps)
+    const submitted = coordinator.submit(baseJob())
+    await registering.promise
+
+    const restart = vi.fn(async () => {})
+    const drained = coordinator.cancelActiveAndDrain(restart)
+    expect(restart).not.toHaveBeenCalled()
+    releaseRegistration.resolve()
+    const { taskId } = await submitted
+    await drained
+
+    expect(restart).toHaveBeenCalledOnce()
+    expect(downloaderFakes).toHaveLength(0)
+    expect(taskManager.getById(taskId)?.status).toBe(TaskStatus.Error)
+  })
+
   it('registers ONE DownloadTask (kind Hls) keyed on a stable taskId', async () => {
     const { deps, taskManager } = makeDeps()
     const c = new MediaTaskCoordinator(deps)

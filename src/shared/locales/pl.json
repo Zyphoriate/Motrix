@@ -1,4 +1,17 @@
 {
+  "mediaSelection": {
+    "title": "Wybierz filmy",
+    "selectAll": "Zaznacz wszystko",
+    "selectNone": "Odznacz wszystko",
+    "selected": "Wybrano {{selected}} z {{total}}",
+    "part": "Część {{number}}",
+    "quality": "Jakość",
+    "download": "Pobierz wybrane",
+    "inspectFailed": "Nie można wczytać filmów. Spróbuj ponownie.",
+    "createFailed": "Nie można utworzyć pobrań. Spróbuj ponownie.",
+    "entryFailed": "{{title}}: {{reason}}",
+    "highest": "Highest"
+  },
   "operatorUnlock": {
     "title": "Odblokuj Motrix",
     "help": "Ten serwer wymaga tokenu operatora. Na hoście ustaw MOTRIX_OPERATOR_TOKEN lub odczytaj token z <dataDir>/operator-token, a następnie wklej go poniżej.",
@@ -1634,7 +1647,10 @@
         "magnetFileSelectionAutoDownloadDesc": "Pobieranie rozpoczyna się po czasie podanym poniżej, nawet jeśli okno aplikacji lub przeglądarka są zamknięte.",
         "magnetFileSelectionTimeoutSeconds": "Czas na wybór plików (s)",
         "magnetFileSelectionTimeoutSecondsDesc": "Odliczanie rozpoczyna się, gdy lista plików jest gotowa. Zmiany dotyczą także zadań już oczekujących.",
-        "magnetFileSelectionTimeoutInvalid": "Wpisz całkowitą liczbę sekund od {{min}} do {{max}}."
+        "magnetFileSelectionTimeoutInvalid": "Wpisz całkowitą liczbę sekund od {{min}} do {{max}}.",
+        "mediaSelectionSkipSingleDialog": "Download single-part media directly",
+        "mediaSelectionSkipSingleDialogDesc": "When enabled, a single part downloads at the chosen quality without opening the picker.",
+        "mediaSelectionHighest": "Highest"
       },
       "seeding": {
         "title": "Udostępnianie",

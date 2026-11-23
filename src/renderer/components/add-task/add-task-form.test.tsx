@@ -43,6 +43,16 @@ vi.mock('@renderer/lib/transport', () => ({
   },
 }))
 
+// Media preview and its unsupported-URL fallback are exercised in media-selection.test.tsx.
+vi.mock('./use-media-selection', () => ({
+  useMediaSelection: () => ({
+    inspect: async () => false,
+    open: false,
+    busy: false,
+    dialog: null,
+  }),
+}))
+
 vi.mock('@renderer/lib/parse-torrent-file', () => ({
   readTorrentFile: vi.fn(),
 }))

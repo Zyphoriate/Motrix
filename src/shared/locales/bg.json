@@ -1,4 +1,17 @@
 {
+  "mediaSelection": {
+    "title": "Избор на видеоклипове",
+    "selectAll": "Избор на всички",
+    "selectNone": "Изчистване на избора",
+    "selected": "Избрани {{selected}} от {{total}}",
+    "part": "Част {{number}}",
+    "quality": "Качество",
+    "download": "Изтегляне на избраните",
+    "inspectFailed": "Видеоклиповете не могат да се заредят. Опитайте отново.",
+    "createFailed": "Изтеглянията не могат да се създадат. Опитайте отново.",
+    "entryFailed": "{{title}}: {{reason}}",
+    "highest": "Highest"
+  },
   "applicationMenu": {
     "actionFailed": "Действието не можа да бъде завършено. Проверете връзката и опитайте отново.",
     "back": "Назад",
@@ -2005,7 +2018,10 @@
         "magnetFileSelectionTimeoutInvalid": "Въведете цяло число от {{min}} до {{max}} секунди.",
         "magnetFileSelectionTimeoutSeconds": "Време за избор на файлове (сек)",
         "magnetFileSelectionTimeoutSecondsDesc": "Отброяването започва, когато списъкът с файлове е готов. Промените важат и за вече чакащи задачи.",
-        "title": "Участници"
+        "title": "Участници",
+        "mediaSelectionSkipSingleDialog": "Download single-part media directly",
+        "mediaSelectionSkipSingleDialogDesc": "When enabled, a single part downloads at the chosen quality without opening the picker.",
+        "mediaSelectionHighest": "Highest"
       },
       "seeding": {
         "seedRatio": "Лимит на коефициента на споделяне",
