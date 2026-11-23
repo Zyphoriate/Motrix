@@ -1,0 +1,50 @@
+name: Media selection image
+
+on:
+  workflow_dispatch:
+    inputs:
+      arch:
+        description: Docker platform architecture
+        required: true
+        default: amd64
+        type: choice
+        options:
+          - amd64
+          - arm64
+
+permissions:
+  contents: read
+
+jobs:
+  image:
+    name: Export media-selection image / ${{ inputs.arch }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build image
+        run: |
+          docker buildx build \
+            --platform "linux/${{ inputs.arch }}" \
+            --tag "motrix-server:media-selection-${{ inputs.arch }}" \
+            --load \
+            .
+
+      - name: Export image and checksum
+        run: |
+          mkdir -p release/ci-image
+          docker save "motrix-server:media-selection-${{ inputs.arch }}" | gzip -1 > "release/ci-image/motrix-server-media-selection-linux-${{ inputs.arch }}.tar.gz"
+          sha256sum "release/ci-image/motrix-server-media-selection-linux-${{ inputs.arch }}.tar.gz" > release/ci-image/SHA256SUMS
+
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: motrix-server-media-selection-linux-${{ inputs.arch }}
+          path: release/ci-image
+          if-no-files-found: error
+          retention-days: 14
