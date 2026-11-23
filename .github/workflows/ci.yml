@@ -227,7 +227,7 @@ jobs:
 
   media-selection-image:
     name: Export media-selection image
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'feat/plugin_media_selection_')
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
