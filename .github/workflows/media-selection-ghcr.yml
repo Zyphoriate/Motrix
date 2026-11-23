@@ -1,0 +1,75 @@
+name: Publish media-selection image to GHCR
+
+on:
+  push:
+    branches: [feat/plugin_media_selection_20261123]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: media-selection-ghcr-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.repository == 'Zyphoriate/Motrix'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+      - name: Choose fork image tags
+        shell: bash
+        run: |
+          owner="${GITHUB_REPOSITORY_OWNER,,}"
+          echo "IMAGE=ghcr.io/${owner}/motrix-server" >> "$GITHUB_ENV"
+      - name: Build amd64 image
+        run: |
+          docker buildx build \
+            --platform linux/amd64 \
+            --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
+            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
+            --label "org.opencontainers.image.title=Motrix media selection fork" \
+            --cache-from type=gha,scope=media-selection-amd64 \
+            --cache-to type=gha,mode=max,scope=media-selection-amd64 \
+            --tag "${IMAGE}:sha-${GITHUB_SHA}" \
+            --load .
+      - name: Smoke image before publishing
+        run: node scripts/smoke-server-image.mjs --image "${IMAGE}:sha-${GITHUB_SHA}"
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Publish tested image
+        run: |
+          docker push "${IMAGE}:sha-${GITHUB_SHA}"
+          for tag in media-selection media-selection-amd64; do
+            docker tag "${IMAGE}:sha-${GITHUB_SHA}" "${IMAGE}:${tag}"
+            docker push "${IMAGE}:${tag}"
+          done
+      - name: Record published digest
+        run: |
+          digest="$(docker buildx imagetools inspect "${IMAGE}:sha-${GITHUB_SHA}" --format '{{.Manifest.Digest}}')"
+          mkdir -p release/ghcr
+          printf '%s@%s\n' "$IMAGE" "$digest" > release/ghcr/image.txt
+          printf '%s:sha-%s\n' "$IMAGE" "$GITHUB_SHA" >> release/ghcr/image.txt
+          printf '### Published media-selection image\n\n```text\n%s@%s\n%s:media-selection\n```\n' "$IMAGE" "$digest" "$IMAGE" >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload image reference
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: media-selection-ghcr-reference
+          path: release/ghcr/image.txt
+          if-no-files-found: error
+          retention-days: 14

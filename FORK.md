@@ -21,12 +21,23 @@ MOTRIX_IMAGE=motrix-server:media-selection docker compose up -d
 
 The standard Compose file retains the upstream volume layout. Back up the existing data directory before replacing a deployed instance. Do not point two running instances at the same data directory. Start with a separate data directory when evaluating the fork.
 
+The fork publishes its tested linux/amd64 image to GHCR from the media-selection branch:
+
+```sh
+docker pull ghcr.io/zyphoriate/motrix-server:media-selection
+MOTRIX_IMAGE=ghcr.io/zyphoriate/motrix-server:media-selection docker compose up -d
+```
+
+The workflow also publishes `media-selection-amd64` and an immutable `sha-<full-commit>` tag. The workflow summary records the registry digest. If the GHCR package is private, authenticate with `docker login ghcr.io` using a token with `read:packages`; public packages support anonymous pulls.
+
 For an exported image archive:
 
 ```sh
 docker load -i motrix-server-media-selection-linux-amd64.tar.gz
-MOTRIX_IMAGE=motrix-server:plugin-media-selection-local docker compose up -d
+MOTRIX_IMAGE=motrix-server:media-selection-amd64 docker compose up -d
 ```
+
+Bilibili plugin source and its `.moext` build artifacts are maintained at [Zyphoriate/motrix-bilibili-resolver](https://github.com/Zyphoriate/motrix-bilibili-resolver). Install the package produced by that repository's Build workflow.
 
 Source builds require the upstream prerequisites, including the native finalize helper and FFmpeg for muxing. If Docker only provides the legacy builder, cache-mount options in the three `RUN --mount=type=cache` instructions must be removed from a local Dockerfile copy; the mount options only cache dependencies and do not change the packaged feature. Use explicit `TARGETARCH=amd64` (or the target architecture supported by your build environment). The tested image is linux/amd64; an ARM64 binary image is not supplied by this build.
 
@@ -46,4 +57,4 @@ Bilibili availability and anonymous 1080P depend on current site responses; the 
 
 ## Track upstream
 
-Keep the media-selection feature branch separate from upstream `main` and preserve an upstream remote pointing to `https://github.com/agalwood/Motrix.git`. Review upstream changes to Add Task, plugin commands, media coordinator, and server packaging when merging a new release. Do not modify the legacy `master` branch. Rebuild the SDK tarballs whenever their source contract changes, update the file dependencies/lockfile, and repeat focused validation. No GitHub fork or remote repository was created automatically by this local implementation.
+Keep the media-selection feature branch separate from upstream `main` and preserve an upstream remote pointing to `https://github.com/agalwood/Motrix.git`. Review upstream changes to Add Task, plugin commands, media coordinator, and server packaging when merging a new release. Do not modify the legacy `master` branch. Rebuild the SDK tarballs whenever their source contract changes, update the file dependencies/lockfile, and repeat focused validation. The maintained fork is [Zyphoriate/Motrix](https://github.com/Zyphoriate/Motrix), with changes reviewed in the media-selection feature branch.

@@ -21,12 +21,23 @@ MOTRIX_IMAGE=motrix-server:media-selection docker compose up -d
 
 标准 Compose 保留上游的数据卷布局。替换现有实例前备份数据目录，不能让两个运行中的实例共用同一个数据目录。初次评估建议使用独立目录。
 
+媒体选择分支通过 CI 将验证过的 linux/amd64 镜像发布到 GHCR：
+
+```sh
+docker pull ghcr.io/zyphoriate/motrix-server:media-selection
+MOTRIX_IMAGE=ghcr.io/zyphoriate/motrix-server:media-selection docker compose up -d
+```
+
+工作流还发布 `media-selection-amd64` 和固定提交的 `sha-<完整提交号>` 标签，摘要会记录镜像 digest。GHCR 包若为私有，先使用具有 `read:packages` 权限的令牌执行 `docker login ghcr.io`；公开包支持匿名拉取。
+
 使用导出的镜像文件：
 
 ```sh
 docker load -i motrix-server-media-selection-linux-amd64.tar.gz
-MOTRIX_IMAGE=motrix-server:plugin-media-selection-local docker compose up -d
+MOTRIX_IMAGE=motrix-server:media-selection-amd64 docker compose up -d
 ```
+
+Bilibili 插件源码和 `.moext` 构建产物位于 [Zyphoriate/motrix-bilibili-resolver](https://github.com/Zyphoriate/motrix-bilibili-resolver)，安装该仓库 Build 工作流生成的插件包。
 
 源码构建仍需要上游的原生文件发布辅助程序等环境，合并分轨需要 FFmpeg。若 Docker 仅有 legacy builder，可在本地 Dockerfile 副本中移除三处 `RUN --mount=type=cache` 的缓存挂载参数；它们只影响依赖缓存，不影响功能。显式指定 `TARGETARCH=amd64`，或构建环境支持的目标架构。本次验证和导出的镜像是 linux/amd64，不包含 ARM64 二进制镜像。
 
@@ -46,4 +57,4 @@ MOTRIX_IMAGE=motrix-server:plugin-media-selection-local docker compose up -d
 
 ## 跟进上游
 
-保留独立功能分支和指向 `https://github.com/agalwood/Motrix.git` 的上游 remote。合入新版本时重点审查新建任务、插件命令、媒体协调器和服务端打包。不要修改旧版 `master`。SDK 源码协议变化后重新打包 tarball、更新依赖锁文件并重跑相关检查。本次仅建立本地 fork 工作分支，没有自动创建 GitHub 远程仓库。
+保留独立功能分支和指向 `https://github.com/agalwood/Motrix.git` 的上游 remote。合入新版本时重点审查新建任务、插件命令、媒体协调器和服务端打包。不要修改旧版 `master`。SDK 源码协议变化后重新打包 tarball、更新依赖锁文件并重跑相关检查。维护中的 fork 位于 [Zyphoriate/Motrix](https://github.com/Zyphoriate/Motrix)，改动保留在媒体选择功能分支中供审查。
