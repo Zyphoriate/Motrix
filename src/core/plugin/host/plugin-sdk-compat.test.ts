@@ -76,10 +76,13 @@ describe('@motrix/plugin-api fixtures', () => {
       name: string
       version: string
     }
-    expect(installed).toMatchObject({
-      name: '@motrix/plugin-api',
-      version: project.devDependencies['@motrix/plugin-api'],
-    })
+    expect(installed.name).toBe('@motrix/plugin-api')
+    const sdkDependency = project.devDependencies['@motrix/plugin-api']
+    expect(sdkDependency).toBe(
+      sdkDependency.startsWith('file:')
+        ? `file:vendor/sdk/motrix-plugin-api-${installed.version}.tgz`
+        : installed.version
+    )
     expectFixtureToTypeCheck(root)
   })
 

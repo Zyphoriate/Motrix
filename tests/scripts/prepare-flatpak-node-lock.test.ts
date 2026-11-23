@@ -1,3 +1,7 @@
+import { execFileSync } from 'node:child_process'
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
 import { load } from 'js-yaml'
 import { describe, expect, it } from 'vitest'
 // @ts-expect-error -- JavaScript packaging script intentionally has no declarations
@@ -25,6 +29,40 @@ describe('prepareFlatpakNodeLock', () => {
         'react@19.3.0': { resolution: { integrity: 'sha512-application' } },
       },
     })
+  })
+
+  it('exports remote sources while keeping vendored tarballs in the install lock', () => {
+    const source = `${application}  '@motrix/plugin-api@file:vendor/sdk/api.tgz':
+    resolution: {integrity: sha512-local, tarball: 'file:vendor/sdk/api.tgz'}
+  remote@1.0.0:
+    resolution: {integrity: sha512-remote, tarball: 'https://example.com/remote.tgz'}
+`
+    const directory = mkdtempSync(path.join(tmpdir(), 'flatpak-node-lock-'))
+    const input = path.join(directory, 'pnpm-lock.yaml')
+    const output = path.join(directory, 'export.yaml')
+    try {
+      writeFileSync(input, source)
+      execFileSync(process.execPath, [
+        'scripts/prepare-flatpak-node-lock.mjs',
+        input,
+        output,
+      ])
+      expect(readFileSync(input, 'utf8')).toBe(source)
+      expect(load(readFileSync(output, 'utf8'))).toEqual({
+        lockfileVersion: '9.0',
+        packages: {
+          'react@19.3.0': { resolution: { integrity: 'sha512-application' } },
+          'remote@1.0.0': {
+            resolution: {
+              integrity: 'sha512-remote',
+              tarball: 'https://example.com/remote.tgz',
+            },
+          },
+        },
+      })
+    } finally {
+      rmSync(directory, { recursive: true, force: true })
+    }
   })
 
   it('accepts legacy single-document locks and identical shared sources', () => {

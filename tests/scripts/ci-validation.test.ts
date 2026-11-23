@@ -15,6 +15,7 @@ import { describe, expect, it } from 'vitest'
 import {
   ALWAYS_REQUIRED,
   CONDITIONAL_JOBS,
+  EVENT_CONDITIONAL_JOBS,
   validateCiResults,
 } from '../../scripts/ci-gate.mjs'
 // @ts-expect-error -- CI script has no declaration file
@@ -196,7 +197,10 @@ describe('CI scope selection', () => {
   }, 15_000)
 })
 
-function successfulNeeds(profile: 'ui' | 'full') {
+function successfulNeeds(
+  profile: 'ui' | 'full',
+  context: { eventName?: string; headRef?: string } = {}
+) {
   const outputs = {
     profile,
     distributions: String(profile === 'full'),
@@ -214,6 +218,9 @@ function successfulNeeds(profile: 'ui' | 'full') {
           : 'skipped',
     }
   }
+  for (const [name, required] of Object.entries(EVENT_CONDITIONAL_JOBS)) {
+    needs[name] = { result: required(context) ? 'success' : 'skipped' }
+  }
   return needs
 }
 
@@ -225,16 +232,49 @@ describe('required CI gate', () => {
   it.each(['failure', 'cancelled', 'skipped', undefined])(
     'rejects every selected job with result %s',
     (result) => {
+      const context = { eventName: 'workflow_dispatch' }
       for (const name of [
         ...ALWAYS_REQUIRED,
         ...Object.keys(CONDITIONAL_JOBS),
+        ...Object.keys(EVENT_CONDITIONAL_JOBS),
       ]) {
-        const needs = successfulNeeds('full')
+        const needs = successfulNeeds('full', context)
         needs[name].result = result
-        expect(() => validateCiResults(needs), name).toThrow()
+        expect(() => validateCiResults(needs, context), name).toThrow()
       }
     }
   )
+
+  it.each([
+    { eventName: 'workflow_dispatch' },
+    {
+      eventName: 'pull_request',
+      headRef: 'feat/plugin_media_selection_20261123',
+    },
+  ])('requires the image export for %j', (context) => {
+    const needs = successfulNeeds('full', context)
+    expect(() => validateCiResults(needs, context)).not.toThrow()
+    delete needs['media-selection-image']
+    expect(() => validateCiResults(needs, context)).toThrow(
+      /media-selection-image/
+    )
+  })
+
+  it.each([
+    { eventName: 'push' },
+    { eventName: 'schedule' },
+    { eventName: 'merge_group' },
+    { eventName: 'pull_request', headRef: 'feat/another_feature' },
+    { eventName: 'pull_request', headRef: 'feat/plugin_media_selection' },
+  ])('requires a skipped image export for %j', (context) => {
+    const needs = successfulNeeds('full', context)
+    expect(needs['media-selection-image'].result).toBe('skipped')
+    expect(() => validateCiResults(needs, context)).not.toThrow()
+    needs['media-selection-image'].result = 'failure'
+    expect(() => validateCiResults(needs, context)).toThrow(
+      /media-selection-image/
+    )
+  })
 
   it('rejects missing jobs, unknown jobs and invalid planning outputs', () => {
     const needs = successfulNeeds('ui')
@@ -252,13 +292,20 @@ describe('required CI gate', () => {
   })
 
   it('accounts for every workflow job and runs even after failures', () => {
-    const jobs = [...ALWAYS_REQUIRED, ...Object.keys(CONDITIONAL_JOBS)].sort()
+    const jobs = [
+      ...ALWAYS_REQUIRED,
+      ...Object.keys(CONDITIONAL_JOBS),
+      ...Object.keys(EVENT_CONDITIONAL_JOBS),
+    ].sort()
     expect(
       Object.keys(workflow.jobs)
         .filter((name) => name !== 'ci')
         .sort()
     ).toEqual(jobs)
     expect([...workflow.jobs.ci.needs].sort()).toEqual(jobs)
+    expect(workflow.jobs['media-selection-image'].if).toBe(
+      "github.event_name == 'workflow_dispatch' || startsWith(github.head_ref, 'feat/plugin_media_selection_')"
+    )
     expect(workflow.jobs.ci.name).toBe('ci')
     expect(workflow.jobs.ci.if).toBe(`\${{ always() }}`)
     expect(workflow.on).toHaveProperty('schedule')

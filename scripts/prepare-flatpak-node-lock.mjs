@@ -8,8 +8,10 @@ import { dump, loadAll } from 'js-yaml'
 
 // pnpm 12 records its package manager in a separate YAML document. The
 // pinned Flatpak generator reads one document and only consumes its packages
-// table. Export the complete source inventory, including bootstrap packages,
-// without rewriting the install lock or dropping either dependency graph.
+// table. Export remote sources, including bootstrap packages, without
+// rewriting the install lock. Local tarballs ship in the project archive and
+// pnpm reads them directly during the offline install; the pinned generator
+// otherwise mistakes file: references for downloadable remote URLs.
 export function prepareFlatpakNodeLock(source) {
   const packages = new Map()
   const documents = loadAll(source)
@@ -31,9 +33,9 @@ export function prepareFlatpakNodeLock(source) {
   return dump({
     lockfileVersion: '9.0',
     packages: Object.fromEntries(
-      [...packages].sort(([left], [right]) =>
-        left < right ? -1 : left > right ? 1 : 0
-      )
+      [...packages]
+        .filter(([, entry]) => !entry.resolution?.tarball?.startsWith('file:'))
+        .sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
     ),
   })
 }

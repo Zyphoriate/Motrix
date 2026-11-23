@@ -79,18 +79,21 @@ const creations = () =>
     .mocked(transport.invoke)
     .mock.calls.filter(([channel]) => channel === Commands.CreateTask)
 
+async function invokeHost(channel: string): Promise<unknown> {
+  if (channel === Commands.CreateTask)
+    return { outcome: 'created', taskId: 'new-task', gid: 'new-gid' }
+  if (channel === Commands.InspectPluginMedia) return null
+  if (channel === Queries.GetSettings)
+    return { app: { autofillClipboardLinks: false } }
+  return []
+}
+
 describe('retry parameters dialog', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     localStorage.clear()
     useRetryParametersStore.getState().close()
-    vi.mocked(transport.invoke).mockImplementation(async (channel) => {
-      if (channel === Commands.CreateTask)
-        return { outcome: 'created', taskId: 'new-task', gid: 'new-gid' }
-      if (channel === Queries.GetSettings)
-        return { app: { autofillClipboardLinks: false } }
-      return []
-    })
+    vi.mocked(transport.invoke).mockImplementation(invokeHost)
   })
   afterEach(() => {
     cleanup()
@@ -154,7 +157,7 @@ describe('retry parameters dialog', () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     vi.mocked(transport.invoke).mockImplementation(async (channel) => {
       if (channel === Commands.CreateTask) throw new Error('Response lost')
-      return []
+      return invokeHost(channel)
     })
     const original = renderShell(
       <AddTaskForm
@@ -275,7 +278,7 @@ describe('retry parameters dialog', () => {
   it('retains the same submission ID after a lost response without persisting credentials', async () => {
     let tries = 0
     vi.mocked(transport.invoke).mockImplementation(async (channel) => {
-      if (channel !== Commands.CreateTask) return []
+      if (channel !== Commands.CreateTask) return invokeHost(channel)
       if (tries++ === 0) throw new Error('Response lost')
       return { outcome: 'created', taskId: 'new-task', gid: 'new-gid' }
     })
@@ -301,7 +304,7 @@ describe('retry parameters dialog', () => {
         ? new Promise((resolve) => {
             finish = resolve
           })
-        : []
+        : invokeHost(channel)
     )
     show([
       failedTask,
