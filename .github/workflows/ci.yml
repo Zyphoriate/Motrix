@@ -225,6 +225,36 @@ jobs:
       - name: Torrent conformance on HTTP without WebCrypto
         run: pnpm test:browser:torrent
 
+  media-selection-image:
+    name: Export media-selection image
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069
+      - name: Build amd64 server image
+        run: |
+          docker buildx build \
+            --platform linux/amd64 \
+            --tag motrix-server:media-selection-amd64 \
+            --load \
+            .
+      - name: Export image and checksum
+        run: |
+          mkdir -p release/ci-image
+          docker save motrix-server:media-selection-amd64 | gzip -1 > release/ci-image/motrix-server-media-selection-linux-amd64.tar.gz
+          sha256sum release/ci-image/motrix-server-media-selection-linux-amd64.tar.gz > release/ci-image/SHA256SUMS
+      - name: Upload image artifact
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: motrix-server-media-selection-linux-amd64
+          path: release/ci-image
+          if-no-files-found: error
+          retention-days: 14
+
   server-runtime:
     name: Server runtime / ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
