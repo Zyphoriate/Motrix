@@ -137,6 +137,66 @@ describe('PluginSettingsForm', () => {
     })
   })
 
+  it('saves and restores the preferred Highest option and single-part dialog switch together', async () => {
+    const schema: JsonSchemaNode = {
+      type: 'object',
+      properties: {
+        preferredQuality: {
+          type: 'string',
+          title: 'Preferred quality',
+          enum: ['highest', '2160p', '1440p', '1080p', '720p', '480p'],
+          enumLabels: { highest: 'Highest', '2160p': '4K (2160P)' },
+          default: 'highest',
+        },
+        showSinglePartDialog: {
+          type: 'boolean',
+          title: 'Show picker for single-part videos',
+          default: false,
+        },
+      },
+    }
+    const user = userEvent.setup()
+    const stored: Record<string, unknown> = { preferredQuality: '720p' }
+    invokeMock.mockImplementation(async (_channel, { patch }) => {
+      Object.assign(stored, patch)
+    })
+    const original = render(
+      <PluginSettingsForm
+        pluginId="community.bilibili-resolver"
+        schema={schema}
+        initialValues={stored}
+      />
+    )
+    await user.click(
+      screen.getByRole('combobox', { name: 'Preferred quality' })
+    )
+    await user.click(await screen.findByRole('option', { name: 'Highest' }))
+    await user.click(
+      screen.getByRole('switch', { name: 'Show picker for single-part videos' })
+    )
+    await user.click(screen.getByRole('button', { name: 'Apply' }))
+    await waitFor(() =>
+      expect(invokeMock).toHaveBeenCalledWith(Commands.UpdatePluginConfig, {
+        pluginId: 'community.bilibili-resolver',
+        patch: { preferredQuality: 'highest', showSinglePartDialog: true },
+      })
+    )
+    original.unmount()
+    render(
+      <PluginSettingsForm
+        pluginId="community.bilibili-resolver"
+        schema={schema}
+        initialValues={stored}
+      />
+    )
+    expect(
+      screen.getByRole('combobox', { name: 'Preferred quality' })
+    ).toHaveTextContent('Highest')
+    expect(
+      screen.getByRole('switch', { name: 'Show picker for single-part videos' })
+    ).toBeChecked()
+  })
+
   it('discards unsaved edits when reset is clicked', async () => {
     const user = userEvent.setup()
     renderForm()

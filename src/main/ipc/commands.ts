@@ -452,6 +452,8 @@ export function buildCommandHandlers(ctx: CommandContext): CommandHandlerMap {
   const mediaSelection = new PluginMediaSelectionService({
     registry: pluginRegistry,
     host: pluginHost,
+    readPluginConfig: (pluginId) =>
+      settingsManager.get().plugins[pluginId] ?? {},
     createTask: (input) => dispatchPluginMediaTask(input, createDeps),
   })
 

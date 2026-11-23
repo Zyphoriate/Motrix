@@ -26,13 +26,19 @@ export function PluginConfigField({
   const { field } = useController({ name, control })
 
   if (node.type === 'boolean') {
-    return <Switch checked={!!field.value} onCheckedChange={field.onChange} />
+    return (
+      <Switch
+        aria-label={node.title ?? name}
+        checked={!!field.value}
+        onCheckedChange={field.onChange}
+      />
+    )
   }
 
   if (Array.isArray(node.enum)) {
     const options = node.enum.map((value) => {
-      const label = String(value)
-      return { label, value: label }
+      const key = String(value)
+      return { label: node.enumLabels?.[key] ?? key, value: key }
     })
 
     return (
@@ -43,7 +49,10 @@ export function PluginConfigField({
           if (value !== null) field.onChange(value)
         }}
       >
-        <SelectTrigger className="w-full max-w-3xs">
+        <SelectTrigger
+          aria-label={node.title ?? name}
+          className="w-full max-w-3xs"
+        >
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

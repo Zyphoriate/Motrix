@@ -21,6 +21,7 @@ export const MediaSelectionPreviewSchema = z
     selectionId: z.string().uuid(),
     pluginId: z.string().min(1).max(256),
     expiresAt: z.number().int().positive(),
+    showSinglePartDialog: z.boolean().optional(),
   })
   .omit({ schemaVersion: true })
 export type MediaSelectionPreview = z.infer<typeof MediaSelectionPreviewSchema>

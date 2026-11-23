@@ -236,7 +236,7 @@ function makeFakeCtx() {
 }
 
 describe('server plugin media selections without extension integration', () => {
-  function setup() {
+  function setup(showSinglePartDialog = false) {
     const ctx = makeFakeCtx()
     const pluginId = 'community.media-resolver'
     const source = 'https://www.bilibili.com/video/BV1GJ411x7h7'
@@ -282,6 +282,14 @@ describe('server plugin media selections without extension integration', () => {
             categories: ['site-resolver'],
             hostPermissions: ['https://*.bilibili.com/*'],
             contributes: {
+              configuration: {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    showSinglePartDialog: { type: 'boolean', default: false },
+                  },
+                },
+              },
               commands: [
                 { id: `${pluginId}.inspectMedia`, public: true },
                 { id: `${pluginId}.resolve`, public: true },
@@ -310,9 +318,30 @@ describe('server plugin media selections without extension integration', () => {
     const mediaRuntime = {
       muxPipeline: { dispatch },
     } as unknown as MediaTaskRuntime
+    vi.mocked(ctx.settingsManager.get).mockReturnValue({
+      plugins: {
+        [pluginId]: { showSinglePartDialog, cookie: 'private-cookie' },
+      },
+    } as unknown as ReturnType<SettingsManager['get']>)
     const handlers = buildServerCommandHandlers({ ...ctx, mediaRuntime })
     return { ctx, handlers, dispatch, invokeCommand, source, pluginId }
   }
+
+  it.each([true, false])(
+    'reads the current single-part dialog preference for preview: %s',
+    async (stored) => {
+      const h = setup(stored)
+      const inspect = () =>
+        h.handlers[Commands.InspectPluginMedia]!({ url: h.source })
+      const preview = await inspect()
+      expect(preview).toHaveProperty('showSinglePartDialog', stored)
+      expect(JSON.stringify(preview)).not.toContain('private-cookie')
+      vi.mocked(h.ctx.settingsManager.get).mockReturnValue({
+        plugins: { [h.pluginId]: { showSinglePartDialog: !stored } },
+      } as unknown as ReturnType<SettingsManager['get']>)
+      expect(await inspect()).toHaveProperty('showSinglePartDialog', !stored)
+    }
+  )
 
   it('inspects then resolves a selected part into the shared mux pipeline using the directory policy', async () => {
     const h = setup()

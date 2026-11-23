@@ -60,6 +60,7 @@ interface Options {
   registry: Pick<PluginRegistry, 'entries' | 'policySnapshot'>
   host: Pick<PluginHost, 'activate' | 'invokeCommand'>
   createTask: (input: PluginMediaTaskInput) => Promise<string>
+  readPluginConfig: (pluginId: string) => Record<string, unknown>
   now?: () => number
 }
 interface Session {
@@ -145,6 +146,32 @@ export class PluginMediaSelectionService {
         qualities: collection.qualities,
         defaultQuality: collection.defaultQuality,
         expiresAt: this.now() + SESSION_TTL_MS,
+      }
+      const configSchema = entry.manifest.contributes.configuration?.schema
+      const properties =
+        configSchema &&
+        typeof configSchema === 'object' &&
+        'properties' in configSchema &&
+        configSchema.properties &&
+        typeof configSchema.properties === 'object'
+          ? (configSchema.properties as Record<string, unknown>)
+          : {}
+      const dialogSetting = properties.showSinglePartDialog
+      if (
+        dialogSetting &&
+        typeof dialogSetting === 'object' &&
+        'type' in dialogSetting &&
+        dialogSetting.type === 'boolean'
+      ) {
+        const stored =
+          this.options.readPluginConfig(pluginId).showSinglePartDialog
+        preview.showSinglePartDialog =
+          typeof stored === 'boolean'
+            ? stored
+            : 'default' in dialogSetting &&
+                typeof dialogSetting.default === 'boolean'
+              ? dialogSetting.default
+              : false
       }
       this.sessions.set(preview.selectionId, {
         preview,

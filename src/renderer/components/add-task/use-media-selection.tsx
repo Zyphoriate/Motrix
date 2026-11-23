@@ -19,18 +19,6 @@ import { useTranslation } from 'react-i18next'
 import { MediaSelectionDialog } from './media-selection-dialog'
 import { taskCreateFailureReason } from './task-create-failure'
 
-function highestQuality(
-  qualities: readonly MediaSelectionQuality[]
-): MediaSelectionQuality {
-  return (
-    [...qualities].sort((a, b) => qualityRank(b) - qualityRank(a))[0] ?? '480p'
-  )
-}
-
-function qualityRank(quality: MediaSelectionQuality): number {
-  return Number.parseInt(quality, 10)
-}
-
 export function useMediaSelection(
   form: UseFormReturn<AddTaskFormValues>,
   active: boolean,
@@ -104,8 +92,9 @@ export function useMediaSelection(
             shouldValidate: false,
           })
         platform.notify('info', 'task.add.batchCreated', { count: 1 })
-        await onSuccess(result.created[0]!.taskId)
-      } catch (cause) {
+        const taskId = result.created[0]?.taskId
+        if (taskId) await onSuccess(taskId)
+      } catch {
         if (activeRef.current && current === generation.current)
           platform.notify('error', 'mediaSelection.createFailed')
       } finally {
@@ -141,12 +130,12 @@ export function useMediaSelection(
         const settings = (await transport.invoke(Queries.GetSettings)) as {
           app?: { mediaSelectionSkipSingleDialog?: boolean }
         }
-        const highest = highestQuality(preview.qualities)
-        if (
-          preview.entries.length === 1 &&
-          settings.app?.mediaSelectionSkipSingleDialog !== false
-        ) {
-          await submitSingle(preview, values, highest, current)
+        if (!activeRef.current || current !== generation.current) return true
+        const showSinglePartDialog =
+          preview.showSinglePartDialog ??
+          settings.app?.mediaSelectionSkipSingleDialog === false
+        if (preview.entries.length === 1 && !showSinglePartDialog) {
+          await submitSingle(preview, values, preview.defaultQuality, current)
           return true
         }
         setError(null)

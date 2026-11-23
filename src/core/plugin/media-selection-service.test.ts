@@ -36,7 +36,9 @@ const resolution = {
     headers: { Referer: source },
   },
 }
-function setup() {
+function setup(
+  options: { dialogSetting?: unknown; config?: Record<string, unknown> } = {}
+) {
   let now = 1_000_000
   const policy = { enabled: true, generation: 1, executableDigest: 'digest-v1' }
   const entries = [
@@ -49,6 +51,15 @@ function setup() {
         categories: ['site-resolver'],
         hostPermissions: ['https://*.bilibili.com/*'],
         contributes: {
+          configuration: {
+            schema: {
+              type: 'object',
+              properties:
+                options.dialogSetting === undefined
+                  ? {}
+                  : { showSinglePartDialog: options.dialogSetting },
+            },
+          },
           commands: [
             { id: `${pluginId}.inspectMedia`, public: true },
             { id: `${pluginId}.resolve`, public: true },
@@ -65,14 +76,17 @@ function setup() {
   const createTask = vi.fn(
     async ({ entry }: { entry: { id: string } }) => `task-${entry.id}`
   )
+  const readPluginConfig = vi.fn(() => options.config ?? {})
   const service = new PluginMediaSelectionService({
     registry: { entries: () => entries, policySnapshot: () => policy } as never,
     host: { activate: vi.fn(async () => undefined), invokeCommand } as never,
     createTask,
+    readPluginConfig,
     now: () => now,
   })
   return {
     service,
+    readPluginConfig,
     invokeCommand,
     createTask,
     entries,
@@ -108,6 +122,71 @@ describe('plugin media selections', () => {
     })
     expect(h.createTask).not.toHaveBeenCalled()
     expect(h.invokeCommand.mock.calls).toHaveLength(1)
+  })
+
+  it.each([true, false])(
+    'includes the stored single-part dialog preference: %s',
+    async (stored) => {
+      const h = setup({
+        dialogSetting: { type: 'boolean', default: !stored },
+        config: { showSinglePartDialog: stored, cookie: 'private-cookie' },
+      })
+      const preview = await h.service.inspect({ url: source })
+      expect(preview?.showSinglePartDialog).toBe(stored)
+      expect(h.readPluginConfig).toHaveBeenCalledWith(pluginId)
+      expect(JSON.stringify(preview)).not.toContain('private-cookie')
+    }
+  )
+
+  it.each([true, false])(
+    'uses the manifest default when no preference is stored: %s',
+    async (defaultValue) => {
+      const h = setup({
+        dialogSetting: { type: 'boolean', default: defaultValue },
+      })
+      expect(
+        (await h.service.inspect({ url: source }))?.showSinglePartDialog
+      ).toBe(defaultValue)
+    }
+  )
+
+  it.each([undefined, 'true', null, 1])(
+    'falls back to false for a missing or invalid preference: %s',
+    async (stored) => {
+      const h = setup({
+        dialogSetting: { type: 'boolean' },
+        config: { showSinglePartDialog: stored },
+      })
+      expect(
+        (await h.service.inspect({ url: source }))?.showSinglePartDialog
+      ).toBe(false)
+    }
+  )
+
+  it.each([undefined, { type: 'string', default: 'true' }])(
+    'omits dialog metadata without a declared boolean setting: %j',
+    async (dialogSetting) => {
+      const h = setup({ dialogSetting, config: { showSinglePartDialog: true } })
+      expect(await h.service.inspect({ url: source })).not.toHaveProperty(
+        'showSinglePartDialog'
+      )
+      expect(h.readPluginConfig).not.toHaveBeenCalled()
+    }
+  )
+
+  it('preserves the provider qualities and non-highest default quality', async () => {
+    const h = setup({ dialogSetting: { type: 'boolean', default: false } })
+    const qualities = ['2160p', '1440p', '1080p', '720p', '480p']
+    h.invokeCommand.mockResolvedValueOnce({
+      ...collection,
+      qualities,
+      defaultQuality: '720p',
+    })
+    expect(await h.service.inspect({ url: source })).toMatchObject({
+      qualities,
+      defaultQuality: '720p',
+      showSinglePartDialog: false,
+    })
   })
 
   it('resolves only selected parts at submit time with the selected quality', async () => {

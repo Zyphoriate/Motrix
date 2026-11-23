@@ -65,7 +65,6 @@ export const bitTorrentFormSchema = z.object({
     magnetFileSelection: true,
     magnetFileSelectionAutoDownload: true,
     magnetFileSelectionTimeoutSeconds: true,
-    mediaSelectionSkipSingleDialog: true,
   }),
   tracker: trackerSettingsInputSchema.pick({
     autoSync: true,

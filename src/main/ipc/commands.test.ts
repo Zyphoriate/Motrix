@@ -317,6 +317,94 @@ function fakeCtx() {
   return { ...base, ...directTaskUpdatePublication(base) }
 }
 
+describe('desktop plugin media selection preferences', () => {
+  it.each([true, false])(
+    'reads the current single-part dialog preference for preview: %s',
+    async (stored) => {
+      const base = fakeCtx()
+      const pluginId = 'community.media-resolver'
+      const source = 'https://www.bilibili.com/video/BV1GJ411x7h7'
+      const get = vi.fn(() => ({
+        plugins: {
+          [pluginId]: {
+            showSinglePartDialog: stored,
+            cookie: 'private-cookie',
+          },
+        },
+      }))
+      const ctx = {
+        ...base,
+        settingsManager: { ...base.settingsManager, get },
+        pluginRegistry: {
+          entries: () => [
+            {
+              enabled: true,
+              executableDigest: 'v1',
+              origin: 'community',
+              manifest: {
+                id: pluginId,
+                categories: ['site-resolver'],
+                hostPermissions: ['https://*.bilibili.com/*'],
+                contributes: {
+                  configuration: {
+                    schema: {
+                      type: 'object',
+                      properties: {
+                        showSinglePartDialog: {
+                          type: 'boolean',
+                          default: false,
+                        },
+                      },
+                    },
+                  },
+                  commands: [
+                    { id: `${pluginId}.inspectMedia`, public: true },
+                    { id: `${pluginId}.resolve`, public: true },
+                  ],
+                },
+              },
+            },
+          ],
+          policySnapshot: () => ({
+            enabled: true,
+            generation: 1,
+            executableDigest: 'v1',
+          }),
+        },
+        pluginHost: {
+          ...base.pluginHost,
+          activate: vi.fn(),
+          invokeCommand: vi.fn(async () => ({
+            schemaVersion: 1,
+            title: 'Video',
+            entries: [{ id: 'part-1', title: 'Video', url: source }],
+            qualities: ['1080p', '720p', '480p'],
+            defaultQuality: '720p',
+          })),
+        },
+      }
+      const handlers = buildCommandHandlers(ctx as unknown as CommandContext)
+      const inspect = () =>
+        handlers[Commands.InspectPluginMedia]!({ url: source })
+      const preview = await inspect()
+      expect(preview).toMatchObject({
+        showSinglePartDialog: stored,
+        defaultQuality: '720p',
+      })
+      expect(JSON.stringify(preview)).not.toContain('private-cookie')
+      get.mockReturnValue({
+        plugins: {
+          [pluginId]: {
+            showSinglePartDialog: !stored,
+            cookie: 'private-cookie',
+          },
+        },
+      })
+      expect(await inspect()).toHaveProperty('showSinglePartDialog', !stored)
+    }
+  )
+})
+
 describe('buildCommandHandlers', () => {
   it.each([
     '/custom profile/settings.json',

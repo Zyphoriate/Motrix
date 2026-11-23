@@ -72,8 +72,6 @@ const DEFAULTS: BtFields = {
       DEFAULT_APP_SETTINGS.magnetFileSelectionAutoDownload,
     magnetFileSelectionTimeoutSeconds:
       DEFAULT_APP_SETTINGS.magnetFileSelectionTimeoutSeconds,
-    mediaSelectionSkipSingleDialog:
-      DEFAULT_APP_SETTINGS.mediaSelectionSkipSingleDialog,
   },
   tracker: {
     autoSync: DEFAULT_TRACKER_SETTINGS.autoSync,
@@ -120,9 +118,6 @@ export function BitTorrentDialog({
             all.app.magnetFileSelectionAutoDownload,
           magnetFileSelectionTimeoutSeconds:
             all.app.magnetFileSelectionTimeoutSeconds,
-          mediaSelectionSkipSingleDialog:
-            all.app.mediaSelectionSkipSingleDialog ??
-            DEFAULT_APP_SETTINGS.mediaSelectionSkipSingleDialog,
         },
         tracker: {
           autoSync: all.tracker.autoSync,
@@ -237,32 +232,6 @@ export function BitTorrentDialog({
                             <Switch
                               checked={field.value}
                               disabled={!fileSelectionEnabled}
-                              onCheckedChange={field.onChange}
-                            />
-                          </FormControl>
-                        </SettingsFormRow>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="app.mediaSelectionSkipSingleDialog"
-                      render={({ field }) => (
-                        <SettingsFormRow>
-                          <div className="space-y-1">
-                            <FormLabel>
-                              {t(
-                                'settings.bittorrent.peers.mediaSelectionSkipSingleDialog'
-                              )}
-                            </FormLabel>
-                            <FormDescription className="text-xs">
-                              {t(
-                                'settings.bittorrent.peers.mediaSelectionSkipSingleDialogDesc'
-                              )}
-                            </FormDescription>
-                          </div>
-                          <FormControl>
-                            <Switch
-                              checked={field.value}
                               onCheckedChange={field.onChange}
                             />
                           </FormControl>

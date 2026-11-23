@@ -96,6 +96,7 @@ export interface JsonSchemaNode {
   items?: JsonSchemaNode
   required?: string[]
   enum?: unknown[]
+  enumLabels?: Record<string, string>
   pattern?: string
   minimum?: number
   maximum?: number

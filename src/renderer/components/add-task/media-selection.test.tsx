@@ -148,7 +148,7 @@ afterEach(() => {
 })
 
 describe('Add Task media selection', () => {
-  it('downloads a single inspected part at the highest quality without opening the dialog', async () => {
+  it('downloads a single inspected part at the provider preference without opening the dialog', async () => {
     const singlePreview = { ...preview, entries: [preview.entries[1]!] }
     invoke.mockImplementation(async (channel) => {
       if (channel === Commands.InspectPluginMedia) return singlePreview
@@ -172,6 +172,83 @@ describe('Add Task media selection', () => {
       connections: 4,
     })
   })
+  it.each(['720p', '2160p'] as const)(
+    'uses the saved %s preference for direct single-part downloads',
+    async (quality) => {
+      const singlePreview: MediaSelectionPreview = {
+        ...preview,
+        entries: [preview.entries[0]!],
+        qualities: ['2160p', '1440p', '1080p', '720p', '480p'],
+        defaultQuality: quality,
+        showSinglePartDialog: false,
+      }
+      invoke.mockImplementation(async (channel) => {
+        if (channel === Commands.InspectPluginMedia) return singlePreview
+        if (channel === Commands.CreatePluginMediaTasks)
+          return {
+            created: [{ entryId: 'one', taskId: 'preferred' }],
+            failed: [],
+          }
+        return { app: { mediaSelectionSkipSingleDialog: false } }
+      })
+      setup()
+      await userEvent.click(screen.getByRole('button', { name: 'Download' }))
+      await waitFor(() =>
+        expect(invoke).toHaveBeenCalledWith(Commands.CreatePluginMediaTasks, {
+          selectionId: singlePreview.selectionId,
+          entryIds: ['one'],
+          quality,
+          saveDir: '/downloads',
+          connections: 4,
+        })
+      )
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    }
+  )
+
+  it('opens the single-part picker when enabled in plugin settings and keeps its preferred quality', async () => {
+    invoke.mockImplementation(async (channel) => {
+      if (channel === Commands.InspectPluginMedia)
+        return {
+          ...preview,
+          entries: [preview.entries[0]!],
+          defaultQuality: '720p',
+          showSinglePartDialog: true,
+        }
+      return { app: { mediaSelectionSkipSingleDialog: true } }
+    })
+    setup()
+    const dialog = await openSelection()
+    expect(
+      within(dialog).getByRole('combobox', { name: 'Quality' })
+    ).toHaveTextContent('720p')
+    expect(
+      invoke.mock.calls.some(
+        ([channel]) => channel === Commands.CreatePluginMediaTasks
+      )
+    ).toBe(false)
+  })
+
+  it('always opens the multipart picker using the plugin preference even when the single-part picker is disabled', async () => {
+    invoke.mockImplementation(async (channel) => {
+      if (channel === Commands.InspectPluginMedia)
+        return {
+          ...preview,
+          defaultQuality: '720p',
+          showSinglePartDialog: false,
+        }
+      return { app: {} }
+    })
+    setup()
+    const dialog = await openSelection()
+    expect(
+      within(dialog).getByRole('combobox', { name: 'Quality' })
+    ).toHaveTextContent('720p')
+    expect(within(dialog).getByRole('status')).toHaveTextContent(
+      '2 of 2 selected'
+    )
+  })
+
   it.each(['web', 'electron'] as const)(
     'submits selected parts and quality through the shared %s form',
     async (kind) => {

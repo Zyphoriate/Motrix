@@ -23,6 +23,7 @@ const ALLOWED_KEYS = new Set([
   'secret',
   'title',
   'description',
+  'enumLabels',
 ])
 
 export function jsonSchemaToZod(node: JsonSchemaNode): z.ZodTypeAny {

@@ -56,7 +56,9 @@ export function MediaSelectionDialog({
   const [selected, setSelected] = useState(
     () => new Set(preview.entries.map((entry) => entry.id))
   )
-  const [quality, setQuality] = useState<MediaSelectionChoice>('highest')
+  const [quality, setQuality] = useState<MediaSelectionChoice>(
+    preview.defaultQuality
+  )
   const rows: MediaEntryRow[] = preview.entries.map((entry, index) => ({
     index,
     id: entry.id,
