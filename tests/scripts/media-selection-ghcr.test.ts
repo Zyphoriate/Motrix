@@ -41,6 +41,10 @@ describe('fork GHCR publication boundary', () => {
       contents: 'read',
       packages: 'write',
     })
+    const publish = workflow.jobs.publish.steps.find((step) =>
+      step.run?.includes('docker tag')
+    )
+    expect(publish?.run).toContain('latest')
   })
 
   it('smokes the built image before registry credentials or publication', () => {
