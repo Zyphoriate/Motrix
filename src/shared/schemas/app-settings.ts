@@ -81,6 +81,7 @@ export const appSettingsSchema = z.object({
   magnetFileSelectionAutoDownload: z.boolean().catch(false),
   magnetFileSelectionTimeoutSeconds:
     magnetFileSelectionTimeoutSecondsSchema.catch(60),
+  mediaSelectionSkipSingleDialog: z.boolean().catch(true),
   browserBridgeEnabled: z.boolean().catch(true),
   liquidGlassEffect: z.boolean().catch(false),
   warnBeforeQuit: z.boolean().catch(true),

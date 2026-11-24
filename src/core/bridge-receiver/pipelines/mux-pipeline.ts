@@ -34,6 +34,8 @@ export class MuxPipeline {
         isComplete: true,
       },
       headers: adapted.sanitizedHeaders,
+      ...(adapted.videoHeaders ? { videoHeaders: adapted.videoHeaders } : {}),
+      ...(adapted.audioHeaders ? { audioHeaders: adapted.audioHeaders } : {}),
       saveDir: adapted.saveDir,
       // ffmpeg needs an output extension or it can't pick a muxer (exit 234).
       finalName: ensureMediaExtension(adapted.finalName, adapted.container),

@@ -3,6 +3,7 @@ import { homedir } from 'node:os'
 import path from 'node:path'
 import { TaskActivityService, TaskActivityStore } from '@core/activity'
 import { createDownloadDirectories } from '@core/bridge-receiver/download-directories'
+import { MediaTaskRuntime } from '@core/bridge-receiver/media-task-runtime'
 import { Aria2SegmentClient } from '@core/download/aria2-segment-client'
 import { Aria2Adapter } from '@core/engine/aria2/aria2-adapter'
 import { Aria2ConfigBuilder } from '@core/engine/aria2/aria2-config-builder'
@@ -605,6 +606,7 @@ let postDeliveryAbortController: AbortController | null = null
 let postDeliveryLoop: Promise<void> | null = null
 let devWatcherHandle: { close(): Promise<void> } | null = null
 let bridgeManager: BridgeManager | null = null
+let mediaTaskRuntime: MediaTaskRuntime | null = null
 let magnetTracker: MagnetTracker | null = null
 let segmentClient: Aria2SegmentClient | null = null
 let disposeIpcIngress: (() => void) | null = null
@@ -673,9 +675,9 @@ function performCleanup(): Promise<void> {
       safely('completed-engine-tasks', () =>
         completedEngineTaskCleanup?.stopAndDrain()
       ),
-      // The bridge owns long-lived HLS/DASH/mux jobs. Closing it cancels media
-      // work and drains accepted bridge handlers.
+      // Drain listener handlers and host-owned media jobs before the engine.
       safely('bridge', () => bridgeManager?.stop()),
+      safely('media', () => mediaTaskRuntime?.stopAndDrain()),
       safely('rpc-notifications', () => {
         for (const unsubscribe of pollingNotificationUnsubscribers.splice(0)) {
           unsubscribe()
@@ -2768,6 +2770,45 @@ async function initializeMainProcess(): Promise<void> {
   menuManager.install()
 
   const nativeMessagingInstaller = createNativeMessagingInstaller()
+  const ffmpegBinariesDir = path.join(platform.userDataDir, 'binaries')
+  // Resolve the configured/user-provided FFmpeg path without executing it.
+  // Running `ffmpeg -version` here would trigger Gatekeeper for quarantined
+  // user binaries during app startup, before any media task needs FFmpeg.
+  const resolveFfmpegLocation = () =>
+    locateFfmpeg(
+      {
+        manualPath: settingsManager.getMedia().ffmpegBinaryPath,
+        userDataBinariesDir: ffmpegBinariesDir,
+        platform: process.platform,
+        envPath: resolveElectronFfmpegEnvPath(),
+      },
+      (candidate) => resolveVerifiedFfmpeg(platform.userDataDir, candidate)
+    )
+  const segmentAria2Client = new Aria2SegmentClient(rpcClient, adapter)
+  segmentClient = segmentAria2Client
+  mediaTaskRuntime = new MediaTaskRuntime({
+    mediaMetaStore,
+    taskManager,
+    activityRecorder: activeTaskActivityService,
+    eventBus,
+    publishTaskUpdate,
+    publishTaskUpdateNow,
+    ffmpegBinaryPath: null,
+    resolveFfmpegBinaryPath: async () =>
+      (await resolveFfmpegLocation()).binaryPath,
+    pickName: (directory, desired) => finalNamePicker.pick(directory, desired),
+    persistTask,
+    persistTaskWithOccurrence,
+    occurrenceDispatcher,
+    parentTaskCreated: (task, persistParent) =>
+      activeTaskInspectorActivityRuntime.parentTaskCreated(task, persistParent),
+    recordTransition: (input) =>
+      activeTaskInspectorActivityRuntime.recordTransition(input),
+    runTaskMutation: (taskIds, operation) =>
+      activeTaskInspectorActivityRuntime.runTaskMutation(taskIds, operation),
+    segmentAria2: segmentAria2Client,
+    tmpRoot: mediaTmpDir,
+  })
   const createBridgeRuntime = async () => {
     const bridgeReAddDeps = {
       taskManager,
@@ -2856,10 +2897,10 @@ async function initializeMainProcess(): Promise<void> {
       publishTaskUpdate,
       publishTaskUpdateNow,
       // Media task removal must tear down the coordinator run (segment
-      // downloaders + ffmpeg), or removing the row orphans them. Lazy over
-      // bridgeManager.current — the coordinator lives in the bridge runtime.
+      // downloaders + ffmpeg), or removing the row orphans them. The host
+      // coordinator remains available when extension integration is disabled.
       cancelMedia: (taskId: string) =>
-        bridgeManager?.current?.cancelMedia(taskId) ?? Promise.resolve(),
+        mediaTaskRuntime?.cancelMedia(taskId) ?? Promise.resolve(),
       deleteParentTasks: (
         taskIds: readonly string[],
         deleteParents: () => void | Promise<void>
@@ -2875,8 +2916,7 @@ async function initializeMainProcess(): Promise<void> {
         activeTaskInspectorActivityRuntime.runTaskMutation(taskIds, operation),
     }
     // Deps for the media-aware pause/resume core action driven by the bridge
-    // control-plane. getMediaSegmentGids is lazy over bridgeManager.current
-    // (same as the IPC command path in commands.ts).
+    // control-plane. Segment ownership is shared with the IPC command path.
     const mediaActionDeps = {
       onPauseRequested: (taskId: string) =>
         trackerManager?.noteTaskControl(taskId, true),
@@ -2897,26 +2937,10 @@ async function initializeMainProcess(): Promise<void> {
       ) =>
         activeTaskInspectorActivityRuntime.runTaskMutation(taskIds, operation),
       getMediaSegmentGids: (id: string) =>
-        bridgeManager?.current?.getMediaSegmentGids(id) ?? [],
+        mediaTaskRuntime?.getMediaSegmentGids(id) ?? [],
       publishTaskUpdate,
       publishTaskUpdateNow,
     }
-    const ffmpegBinariesDir = path.join(platform.userDataDir, 'binaries')
-    // Resolve the configured/user-provided FFmpeg path without executing it.
-    // Running `ffmpeg -version` here would trigger Gatekeeper for quarantined
-    // user binaries during app startup, before any media task needs FFmpeg.
-    const resolveFfmpegLocation = () =>
-      locateFfmpeg(
-        {
-          manualPath: settingsManager.getMedia().ffmpegBinaryPath,
-          userDataBinariesDir: ffmpegBinariesDir,
-          platform: process.platform,
-          envPath: resolveElectronFfmpegEnvPath(),
-        },
-        (candidate) => resolveVerifiedFfmpeg(platform.userDataDir, candidate)
-      )
-    const segmentAria2Client = new Aria2SegmentClient(rpcClient, adapter)
-    segmentClient = segmentAria2Client
     const revealInFolder = createRevealInFolderHandler({
       shell,
       getTask: (taskId) => taskManager.getById(taskId),
@@ -2932,6 +2956,7 @@ async function initializeMainProcess(): Promise<void> {
       getSettings: () => settingsManager.getApp(),
     })
     return bootstrapBridge({
+      mediaRuntime: mediaTaskRuntime ?? undefined,
       ...(handoffJournal
         ? {
             extensionHandoff: desktopDownloadHandoff(
@@ -3114,6 +3139,7 @@ async function initializeMainProcess(): Promise<void> {
   })
 
   const disposeCommandHandlers = registerCommandHandlers({
+    mediaRuntime: mediaTaskRuntime,
     btStorageRuntime: pluginRuntime.finalize,
     persistBtStorage: (task, source, target) =>
       sessionManager.persistBtStorage(task, source, target),

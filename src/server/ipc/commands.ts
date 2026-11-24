@@ -1,3 +1,4 @@
+import type { MediaTaskRuntime } from '@core/bridge-receiver/media-task-runtime'
 import type { Aria2RpcClient } from '@core/engine/aria2/aria2-rpc-client'
 import type { DnsFallbackConsumer } from '@core/engine/aria2/dns-fallback'
 import { dnsModeToAsyncDns } from '@core/engine/aria2/dns-fallback'
@@ -8,6 +9,7 @@ import type { EventBus } from '@core/events/event-bus'
 import type { GeoIPManager } from '@core/geoip/geo-ip-manager'
 import { createUpdateGeoIPDatabaseHandler } from '@core/geoip/update-geo-ip-database'
 import { getLogger } from '@core/logger'
+import { dispatchPluginMediaTask } from '@core/media/plugin-media-dispatch'
 import { publishEngineRestartRequired } from '@core/notifications/engine-restart-required'
 import type { NotificationCenter } from '@core/notifications/notification-center'
 import type { CapabilityHost } from '@core/plugin/capabilities/interface'
@@ -19,6 +21,7 @@ import type { ActivationDispatcher } from '@core/plugin/host/activation-dispatch
 import type { PluginHost } from '@core/plugin/host/plugin-host'
 import type { PluginInstaller } from '@core/plugin/install/plugin-installer'
 import { PluginEngineVersionTooOld } from '@core/plugin/manifest/errors'
+import { PluginMediaSelectionService } from '@core/plugin/media-selection-service'
 import { PluginNetworkError } from '@core/plugin/network/plugin-network-error'
 import { operationHandlers } from '@core/plugin/operations/operation-handlers'
 import type { OperationService } from '@core/plugin/operations/operation-service'
@@ -121,6 +124,7 @@ import type { ServerDirectoryService } from '../server-directory-service'
 import { unsupportedLegacyImportCommands } from './legacy-import'
 
 export interface ServerCommandContext {
+  mediaRuntime?: MediaTaskRuntime
   updateService: Pick<ServerUpdateService, 'check' | 'setChannel'>
   userDataDir: string
   trackAsyncWork?: <T>(operation: () => Promise<T>) => Promise<T>
@@ -315,9 +319,25 @@ export function buildServerCommandHandlers(
     waitForEngineReady: () =>
       supervisor.waitUntilReady(ENGINE_READY_TIMEOUT_MS),
     assertEngineReady: () => supervisor.assertReady(),
+    dispatchMux: (adapted) => {
+      if (!ctx.mediaRuntime)
+        throw new AppError(
+          ErrorCode.EngineFeatureUnavailable,
+          'settings.integration.media.pipelineUnavailable'
+        )
+      return ctx.mediaRuntime.muxPipeline.dispatch(adapted)
+    },
     prepareSaveDir: (requested: string) =>
       downloadPathPolicy.prepareSaveDir(requested),
   }
+
+  const mediaSelection = new PluginMediaSelectionService({
+    registry: pluginRegistry,
+    host: pluginHost,
+    readPluginConfig: (pluginId) =>
+      settingsManager.get().plugins[pluginId] ?? {},
+    createTask: (input) => dispatchPluginMediaTask(input, createDeps),
+  })
 
   const log = getLogger('server:commands')
 
@@ -527,6 +547,18 @@ export function buildServerCommandHandlers(
       await settingsManager.acceptDisclaimer()
       trackerManager.applySyncScheduleChange()
       return { ok: true }
+    },
+
+    [Commands.InspectPluginMedia]: (request: unknown) =>
+      mediaSelection.inspect(request),
+    [Commands.CreatePluginMediaTasks]: async (request: unknown) => {
+      const result = await mediaSelection.create(request)
+      // A rejected save directory must reach the user as the directory
+      // policy's message (the selection dialog surfaces failed entries).
+      for (const failure of result.failed) {
+        log.warn({ entryId: failure.entryId }, 'plugin media task failed')
+      }
+      return result
     },
 
     [Commands.AddMagnetTask]: async (params: {
@@ -840,7 +872,11 @@ export function buildServerCommandHandlers(
     }),
 
     [Commands.RestartEngine]: async () => {
-      await supervisor.restart()
+      if (ctx.mediaRuntime) {
+        await ctx.mediaRuntime.cancelActiveAndDrain(() => supervisor.restart())
+      } else {
+        await supervisor.restart()
+      }
       return { ok: true }
     },
 

@@ -1,4 +1,17 @@
 {
+  "mediaSelection": {
+    "title": "选择视频",
+    "selectAll": "全选",
+    "selectNone": "全不选",
+    "selected": "已选择 {{selected}} / {{total}} 项",
+    "part": "第 {{number}} P",
+    "quality": "清晰度",
+    "download": "下载所选视频",
+    "inspectFailed": "无法加载视频，请重试。",
+    "createFailed": "无法创建下载任务，请重试。",
+    "entryFailed": "{{title}}：{{reason}}",
+    "highest": "Highest"
+  },
   "operatorUnlock": {
     "title": "登录 Motrix",
     "help": "首次登录或忘记密码时，请向服务器管理员获取访问密码。",
@@ -1592,7 +1605,10 @@
         "magnetFileSelectionAutoDownloadDesc": "超过下方等待时间后开始下载；关闭窗口或浏览器后仍会生效。",
         "magnetFileSelectionTimeoutSeconds": "选择文件等待时间（秒）",
         "magnetFileSelectionTimeoutSecondsDesc": "从文件列表加载完成时计时，也适用于正在等待的任务。",
-        "magnetFileSelectionTimeoutInvalid": "请输入 {{min}} 至 {{max}} 秒之间的整数。"
+        "magnetFileSelectionTimeoutInvalid": "请输入 {{min}} 至 {{max}} 秒之间的整数。",
+        "mediaSelectionSkipSingleDialog": "单P直接下载",
+        "mediaSelectionSkipSingleDialogDesc": "开启后，只有一个分P时直接按选定画质下载，不显示选择弹窗。",
+        "mediaSelectionHighest": "最高"
       },
       "seeding": {
         "title": "做种",

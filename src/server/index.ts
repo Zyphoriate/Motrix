@@ -13,6 +13,7 @@ import { FileRegistryStoreAdapter } from '@core/bridge/registry-store-adapter'
 import { TrustedExtensionRegistry } from '@core/bridge/trusted-extension-registry'
 import { BridgeReceiver } from '@core/bridge-receiver/bridge-receiver'
 import { createDownloadDirectories } from '@core/bridge-receiver/download-directories'
+import { MediaTaskRuntime } from '@core/bridge-receiver/media-task-runtime'
 import { Aria2Adapter } from '@core/engine/aria2/aria2-adapter'
 import { Aria2ConfigBuilder } from '@core/engine/aria2/aria2-config-builder'
 import { Aria2ProcessManager } from '@core/engine/aria2/aria2-process-manager'
@@ -1373,7 +1374,30 @@ async function main() {
     currentVersion: appVersion,
     channel: settingsManager.getApp().updateChannel,
   })
+  const mediaTaskRuntime = new MediaTaskRuntime({
+    mediaMetaStore,
+    taskManager,
+    activityRecorder: taskActivityService,
+    eventBus,
+    publishTaskUpdate,
+    publishTaskUpdateNow,
+    ffmpegBinaryPath: null,
+    resolveFfmpegBinaryPath: mediaRuntime.resolveFfmpegBinaryPath,
+    pickName: (directory, desired) => finalNamePicker.pick(directory, desired),
+    persistTask,
+    persistTaskWithOccurrence,
+    occurrenceDispatcher,
+    parentTaskCreated: (task, persistParent) =>
+      createParent(task, persistParent),
+    recordTransition: (input) =>
+      taskInspectorActivityRuntime.recordTransition(input),
+    runTaskMutation: (taskIds, operation) =>
+      taskInspectorActivityRuntime.runTaskMutation(taskIds, operation),
+    segmentAria2: mediaRuntime.segmentAria2,
+    tmpRoot: mediaRuntime.tmpRoot,
+  })
   const commandHandlers = buildServerCommandHandlers({
+    mediaRuntime: mediaTaskRuntime,
     updateService,
     userDataDir: platform.userDataDir,
     trackAsyncWork: (operation) => shellAsyncWork.run(operation),
@@ -1411,8 +1435,8 @@ async function main() {
     trackerManager,
     bridgeControl: bridgeManager,
     getMediaSegmentGids: (taskId) =>
-      bridgeManager.current?.getMediaSegmentGids(taskId) ?? [],
-    cancelMedia: (taskId) => bridgeManager.cancelMedia(taskId),
+      mediaTaskRuntime.getMediaSegmentGids(taskId),
+    cancelMedia: (taskId) => mediaTaskRuntime.cancelMedia(taskId),
     aria2BinaryPath: platform.aria2BinaryPath,
     finalNamePicker,
     torrentMetaStore,
@@ -1670,7 +1694,10 @@ async function main() {
   // publish a resource after its corresponding shutdown step has already run.
   shutdownActions.closeBridge = async () => {
     await bridgeOwnershipSetup
-    await bridgeManager.shutdown()
+    await Promise.all([
+      bridgeManager.shutdown(),
+      mediaTaskRuntime.stopAndDrain(),
+    ])
     bridgeRegistryReady = false
     const dataDirLock = bridgeProcessDataDirLock
     bridgeProcessDataDirLock = null
@@ -2158,10 +2185,9 @@ async function main() {
     // The manager keeps every bridge:* RPC registered while this factory owns
     // only the optional listener/runtime portion.
     bridgeRuntimeFactory = async (): Promise<ServerBridgeRuntime> => {
-      let receiver: BridgeReceiver | null = null
       const removeTaskDeps = {
         authorizeTaskRemoval: nasTaskAccess?.authorizeRemoval,
-        cancelMedia: async (taskId: string) => receiver?.cancelMedia(taskId),
+        cancelMedia: (taskId: string) => mediaTaskRuntime.cancelMedia(taskId),
         taskManager,
         adapter,
         log,
@@ -2231,7 +2257,7 @@ async function main() {
         authorizeTaskWrite: nasTaskAccess?.authorizeWrite,
         authorizeTaskRemoval: nasTaskAccess?.authorizeRemoval,
         getMediaSegmentGids: (taskId: string) =>
-          receiver?.getMediaSegmentGids(taskId) ?? [],
+          mediaTaskRuntime.getMediaSegmentGids(taskId),
         onPauseRequested: (taskId: string) =>
           trackerManager.noteTaskControl(taskId, true),
         onResumeRequested: (taskId: string) =>
@@ -2322,7 +2348,8 @@ async function main() {
         remoteExtensionConfig,
         trustedExtensionRegistry,
         createExtensionReceiver: ({ bridgeBus }) =>
-          (receiver = new BridgeReceiver({
+          new BridgeReceiver({
+            mediaRuntime: mediaTaskRuntime,
             mediaMetaStore,
             getDefaultSaveDir: () => settingsManager.getApp().defaultSaveDir,
             resolveSaveDir: downloadDirectories.resolveSelection,
@@ -2376,7 +2403,7 @@ async function main() {
               taskInspectorActivityRuntime.runTaskMutation(taskIds, operation),
             waitForReady: () =>
               supervisor.waitUntilReady(ENGINE_READY_TIMEOUT_MS),
-          })),
+          }),
         // The web approval UI is a separate (Fastify) service; the operator points
         // device-code clients at it via MOTRIX_PUBLIC_URL. Unset → no URL printed.
         verificationUri: nas

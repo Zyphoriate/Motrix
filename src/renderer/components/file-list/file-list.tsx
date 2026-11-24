@@ -13,12 +13,15 @@ interface FileListProps<T extends BaseFileRow = BaseFileRow> {
   selectedIndices: number[]
   onSelectionChange?: (indices: number[]) => void
   readOnly?: boolean
+  disabled?: boolean
   scrollbar?: 'native' | 'custom'
   className?: string
   /** Optional slot rendered in the sticky header's trailing area. */
   headerSlot?: ReactNode
   headerClassName?: string
   showColumnHeaders?: boolean
+  /** Optional replacement for the selected-count/size summary in the header. */
+  summary?: ReactNode
   /** Optional trailing renderer per row (e.g. progress percent in detail). */
   renderRowTrailing?: (file: T) => ReactNode
   rowTrailingLabel?: string
@@ -30,11 +33,13 @@ export function FileList<T extends BaseFileRow = BaseFileRow>({
   selectedIndices,
   onSelectionChange,
   readOnly = false,
+  disabled = false,
   scrollbar = 'native',
   className,
   headerSlot,
   headerClassName,
   showColumnHeaders = true,
+  summary,
   renderRowTrailing,
   rowTrailingLabel,
   renderRowSize,
@@ -57,12 +62,12 @@ export function FileList<T extends BaseFileRow = BaseFileRow>({
     [files, selectedSet]
   )
 
-  const summary = `${t('task.torrent.fileSelected', {
+  const defaultSummary = `${t('task.torrent.fileSelected', {
     count: selectedIndices.length,
   })} · ${formatBytes(totalSelectedSize)}`
 
   function toggleSelectAll() {
-    if (readOnly || !onSelectionChange) return
+    if (readOnly || disabled || !onSelectionChange) return
     if (allSelected) {
       onSelectionChange([])
     } else {
@@ -71,7 +76,7 @@ export function FileList<T extends BaseFileRow = BaseFileRow>({
   }
 
   function toggleFile(index: number) {
-    if (readOnly || !onSelectionChange) return
+    if (readOnly || disabled || !onSelectionChange) return
     if (selectedSet.has(index)) {
       onSelectionChange(selectedIndices.filter((i) => i !== index))
     } else {
@@ -99,11 +104,14 @@ export function FileList<T extends BaseFileRow = BaseFileRow>({
               <Checkbox
                 checked={allSelected}
                 indeterminate={someSelected}
+                disabled={disabled}
                 onCheckedChange={toggleSelectAll}
                 aria-label={t('task.torrent.selectAll')}
               />
             )}
-            <span className="min-w-0 flex-1 tabular-nums">{summary}</span>
+            <span className="min-w-0 flex-1 tabular-nums">
+              {summary ?? defaultSummary}
+            </span>
             {headerSlot}
           </div>
           {showColumnHeaders && (
@@ -143,7 +151,7 @@ export function FileList<T extends BaseFileRow = BaseFileRow>({
             <Checkbox
               checked={isSelected}
               onCheckedChange={() => toggleFile(file.index)}
-              disabled={readOnly}
+              disabled={readOnly || disabled}
               aria-label={file.path}
             />
             <MiddleEllipsis

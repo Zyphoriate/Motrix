@@ -63,6 +63,8 @@ function makeFakeAria2(opts?: {
   >()
   let completeCb: ((gid: string) => void) | null = null
   let errorCb: ((gid: string) => void) | null = null
+  let listenerRegistrations = 0
+  let activeListeners = 0
   let nextGidN = 1
 
   const aria2: SegmentAria2 = {
@@ -85,9 +87,19 @@ function makeFakeAria2(opts?: {
     },
     onComplete(cb) {
       completeCb = cb
+      activeListeners += 1
+      listenerRegistrations += 1
+      return () => {
+        activeListeners -= 1
+      }
     },
     onError(cb) {
       errorCb = cb
+      activeListeners += 1
+      listenerRegistrations += 1
+      return () => {
+        activeListeners -= 1
+      }
     },
   }
 
@@ -101,6 +113,12 @@ function makeFakeAria2(opts?: {
     },
     get removeDownloadResultCalls() {
       return removeDownloadResultCalls
+    },
+    get activeListeners() {
+      return activeListeners
+    },
+    get listenerRegistrations() {
+      return listenerRegistrations
     },
     /** Set the byte counts aria2 would report for a gid on the next poll. */
     setBytes(gid: string, completedLength: number, totalLength: number) {
@@ -554,6 +572,25 @@ describe('SegmentDownloader', () => {
     await runPromise
   })
 
+  it('unsubscribes both aria2 callbacks when a run settles', async () => {
+    const f = makeFakeAria2()
+    const downloader = new SegmentDownloader({
+      aria2: f.aria2,
+      tmpDir: TMP,
+      pollScheduler: neverSchedule,
+    })
+    const run = downloader.run(
+      makePlan({ segments: [{ url: 'https://cdn/a.ts' }] }),
+      {},
+      () => {}
+    )
+    await new Promise((resolve) => setImmediate(resolve))
+    f.fireComplete('gid1')
+    await run
+    expect(f.listenerRegistrations).toBe(2)
+    expect(f.activeListeners).toBe(0)
+  })
+
   it('purges every completed gid before the run resolves', async () => {
     const fake = makeFakeAria2()
     const dl = new SegmentDownloader({
@@ -842,6 +879,7 @@ describe('SegmentDownloader', () => {
       fake.fireComplete('gid1')
       await run
       expect(stopped).toBe(true)
+      expect(fake.activeListeners).toBe(0)
     }
     // cancel path
     {
@@ -860,6 +898,7 @@ describe('SegmentDownloader', () => {
       await dl.cancel()
       await run.catch(() => {})
       expect(stopped).toBe(true)
+      expect(fake.activeListeners).toBe(0)
     }
   })
 
@@ -895,6 +934,7 @@ describe('SegmentDownloader', () => {
     await cancelPromise
 
     // Verify: the returned gid was forceRemoved, not added to activeGids/activeJobs
+    expect(fake.activeListeners).toBe(0)
     expect(fake.forceRemoveCalls).toHaveLength(1)
     expect(fake.forceRemoveCalls[0].gid).toBe('gid1')
 

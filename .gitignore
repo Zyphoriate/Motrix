@@ -58,6 +58,8 @@ typings/
 
 # Output of 'npm pack'
 *.tgz
+# Fork SDK artifacts are pinned build inputs, not disposable output.
+!/vendor/sdk/*.tgz
 
 # Yarn Integrity file
 .yarn-integrity

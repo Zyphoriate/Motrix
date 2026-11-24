@@ -65,6 +65,8 @@ export interface MediaJob {
   audio?: SegmentPlan
   manifests?: MediaManifest[]
   headers: Record<string, string>
+  videoHeaders?: Record<string, string>
+  audioHeaders?: Record<string, string>
   saveDir: string
   finalName: string
   sourceMeta: SourceMeta
@@ -171,6 +173,7 @@ export class MediaTaskCoordinator {
   private readonly backgroundRuns = new Set<Promise<unknown>>()
   private readonly now: () => number
   private acceptingSubmissions = true
+  private restartPromise: Promise<void> | null = null
   private drainPromise: Promise<void> | null = null
   /** Wall-clock (ms) of the last emitted TaskUpdated, for progress throttling. */
   private lastEmitAt = 0
@@ -188,6 +191,9 @@ export class MediaTaskCoordinator {
   async submit(job: MediaJob): Promise<{ taskId: string }> {
     if (!this.acceptingSubmissions) {
       throw new Error('MediaTaskCoordinator is stopped')
+    }
+    if (this.restartPromise) {
+      throw new Error('MediaTaskCoordinator is draining for engine restart')
     }
 
     const taskId = job.taskId ?? this.deps.mintTaskId?.() ?? newTaskId()
@@ -440,10 +446,9 @@ export class MediaTaskCoordinator {
     this.emitUpdate(true)
     onAccepted?.()
 
-    // A shutdown can race a submit while the latter is crossing its durable
-    // registration barrier. Once cancellation ownership exists, honor the
-    // already-closed gate before starting any segment transfer.
-    if (!this.acceptingSubmissions) {
+    // Shutdown or restart can race a submit crossing its durable registration
+    // barrier. Cancel the registered task before starting any segment transfer.
+    if (!this.acceptingSubmissions || this.restartPromise) {
       await this.cancel(taskId)
       throw new Error('MediaTaskCoordinator stopped during submit')
     }
@@ -639,7 +644,7 @@ export class MediaTaskCoordinator {
 
       const runVideo = videoDownloader.run(
         job.video,
-        job.headers,
+        job.videoHeaders ?? job.headers,
         onStreamProgress(videoBytes, TaskInstancePhase.HlsSegment),
         onFileProgress('video')
       )
@@ -651,7 +656,7 @@ export class MediaTaskCoordinator {
         audioDownloader && audioPlan
           ? audioDownloader.run(
               audioPlan,
-              job.headers,
+              job.audioHeaders ?? job.headers,
               onStreamProgress(audioBytes, TaskInstancePhase.HlsAudio),
               onFileProgress('audio')
             )
@@ -894,14 +899,39 @@ export class MediaTaskCoordinator {
     })
   }
 
+  /** Cancel active media runs and hold admission closed through engine restart. */
+  cancelActiveAndDrain(restart: () => Promise<void>): Promise<void> {
+    if (!this.acceptingSubmissions) {
+      return Promise.reject(new Error('MediaTaskCoordinator is stopped'))
+    }
+    if (this.restartPromise) return this.restartPromise
+    this.restartPromise = Promise.resolve()
+      .then(() => this.cancelAndDrain())
+      .then(() => {
+        if (!this.acceptingSubmissions) {
+          throw new Error('MediaTaskCoordinator is stopped')
+        }
+        return restart()
+      })
+      .finally(() => {
+        this.restartPromise = null
+      })
+    return this.restartPromise
+  }
+
   /**
    * Close the submit gate synchronously, cancel every coordinator-owned media
-   * process, and wait only for those background runs to settle. Idempotent.
+   * process, and wait for background runs and any engine restart to settle.
    */
   stopAndDrain(): Promise<void> {
     if (this.drainPromise) return this.drainPromise
     this.acceptingSubmissions = false
-    this.drainPromise = this.cancelAndDrain()
+    this.drainPromise = this.restartPromise
+      ? this.restartPromise.then(
+          () => undefined,
+          () => undefined
+        )
+      : this.cancelAndDrain()
     return this.drainPromise
   }
 

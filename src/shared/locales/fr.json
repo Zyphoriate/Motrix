@@ -1,4 +1,17 @@
 {
+  "mediaSelection": {
+    "title": "Choisir les vidéos",
+    "selectAll": "Tout sélectionner",
+    "selectNone": "Tout désélectionner",
+    "selected": "{{selected}} sur {{total}} sélectionnés",
+    "part": "Partie {{number}}",
+    "quality": "Qualité",
+    "download": "Télécharger la sélection",
+    "inspectFailed": "Impossible de charger les vidéos. Réessayez.",
+    "createFailed": "Impossible de créer les téléchargements. Réessayez.",
+    "entryFailed": "{{title}} : {{reason}}",
+    "highest": "Highest"
+  },
   "applicationMenu": {
     "actionFailed": "L’action n’a pas pu être effectuée. Vérifiez la connexion et réessayez.",
     "back": "Retour",
@@ -2024,7 +2037,10 @@
         "magnetFileSelectionTimeoutInvalid": "Saisissez un nombre entier de secondes compris entre {{min}} et {{max}}.",
         "magnetFileSelectionTimeoutSeconds": "Délai de sélection des fichiers (s)",
         "magnetFileSelectionTimeoutSecondsDesc": "Démarre lorsque la liste des fichiers est prête. Les modifications s’appliquent aussi aux tâches déjà en attente.",
-        "title": "Pairs"
+        "title": "Pairs",
+        "mediaSelectionSkipSingleDialog": "Download single-part media directly",
+        "mediaSelectionSkipSingleDialogDesc": "When enabled, a single part downloads at the chosen quality without opening the picker.",
+        "mediaSelectionHighest": "Highest"
       },
       "seeding": {
         "seedRatio": "Limite du ratio de partage",

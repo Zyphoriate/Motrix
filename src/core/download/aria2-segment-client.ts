@@ -30,8 +30,8 @@ interface SegmentResultLifecycle {
 export class Aria2SegmentClient implements SegmentAria2 {
   private readonly rpc: Aria2Rpc
   private readonly resultLifecycle: SegmentResultLifecycle
-  private readonly completeCallbacks: Array<(gid: string) => void> = []
-  private readonly errorCallbacks: Array<(gid: string) => void> = []
+  private readonly completeCallbacks = new Set<(gid: string) => void>()
+  private readonly errorCallbacks = new Set<(gid: string) => void>()
   private readonly active = new Set<string>()
 
   constructor(rpc: Aria2Rpc, resultLifecycle: SegmentResultLifecycle) {
@@ -54,12 +54,18 @@ export class Aria2SegmentClient implements SegmentAria2 {
     return this.active.has(gid)
   }
 
-  onComplete(cb: (gid: string) => void): void {
-    this.completeCallbacks.push(cb)
+  onComplete(cb: (gid: string) => void): () => void {
+    this.completeCallbacks.add(cb)
+    return () => {
+      this.completeCallbacks.delete(cb)
+    }
   }
 
-  onError(cb: (gid: string) => void): void {
-    this.errorCallbacks.push(cb)
+  onError(cb: (gid: string) => void): () => void {
+    this.errorCallbacks.add(cb)
+    return () => {
+      this.errorCallbacks.delete(cb)
+    }
   }
 
   async addUri(

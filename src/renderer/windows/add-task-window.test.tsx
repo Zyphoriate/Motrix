@@ -31,6 +31,7 @@ describe('AddTaskWindow', () => {
       if (channel === Queries.GetSettings) {
         return { app: { defaultSaveDir: '/downloads' } }
       }
+      if (channel === Commands.InspectPluginMedia) return null
       if (channel === Commands.CreateTask) {
         throw new Error(
           "Error invoking remote method 'command:createTask': AppError: ffmpeg is required to download this video: its video and audio are separate streams that must be muxed. Install ffmpeg (or set MOTRIX_FFMPEG_BIN) and restart Motrix."

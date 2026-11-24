@@ -147,6 +147,44 @@ describe('resolveManifestI18n', () => {
     expect(schema.properties.server?.properties?.host?.title).toBe('Host')
   })
 
+  it('localizes enum labels without changing saved enum values and falls back per label', () => {
+    const manifest: PluginManifest = {
+      ...M,
+      contributes: {
+        configuration: {
+          schema: {
+            type: 'object',
+            properties: {
+              quality: {
+                type: 'string',
+                enum: ['highest', '2160p'],
+                enumLabels: {
+                  highest: '%quality.highest%',
+                  '2160p': '%quality.4k%',
+                },
+                default: 'highest',
+              },
+            },
+          },
+        },
+      },
+    }
+    const result = resolveManifestI18n(manifest, {
+      currentDict: { 'quality.highest': '最高' },
+      fallbackDict: { 'quality.highest': 'Highest', 'quality.4k': '4K' },
+    })
+    const quality = (
+      (result.contributes.configuration?.schema ?? {}) as JsonSchemaNode
+    ).properties?.quality
+    expect(quality?.enumLabels).toEqual({ highest: '最高', '2160p': '4K' })
+    expect(quality?.enum).toEqual(['highest', '2160p'])
+    expect(quality?.default).toBe('highest')
+    const originalQuality = (
+      (manifest.contributes.configuration?.schema ?? {}) as JsonSchemaNode
+    ).properties?.quality
+    expect(originalQuality?.enumLabels?.highest).toBe('%quality.highest%')
+  })
+
   it('resolves schema.items.title for array types', () => {
     const m: PluginManifest = {
       ...M,

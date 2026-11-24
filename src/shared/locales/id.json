@@ -1,4 +1,17 @@
 {
+  "mediaSelection": {
+    "title": "Pilih video",
+    "selectAll": "Pilih semua",
+    "selectNone": "Batalkan semua",
+    "selected": "{{selected}} dari {{total}} dipilih",
+    "part": "Bagian {{number}}",
+    "quality": "Kualitas",
+    "download": "Unduh pilihan",
+    "inspectFailed": "Video tidak dapat dimuat. Coba lagi.",
+    "createFailed": "Unduhan tidak dapat dibuat. Coba lagi.",
+    "entryFailed": "{{title}}: {{reason}}",
+    "highest": "Highest"
+  },
   "operatorUnlock": {
     "title": "Buka akses Motrix",
     "help": "Server ini memerlukan token operator. Pada host, atur MOTRIX_OPERATOR_TOKEN atau baca token dari <dataDir>/operator-token, lalu tempelkan di bawah ini.",
@@ -1592,7 +1605,10 @@
         "magnetFileSelectionAutoDownloadDesc": "Dimulai setelah waktu di bawah ini berlalu, meskipun jendela aplikasi atau browser ditutup.",
         "magnetFileSelectionTimeoutSeconds": "Waktu untuk memilih berkas (dtk)",
         "magnetFileSelectionTimeoutSecondsDesc": "Dimulai saat daftar berkas siap. Perubahan juga berlaku untuk tugas yang sudah menunggu.",
-        "magnetFileSelectionTimeoutInvalid": "Masukkan bilangan bulat antara {{min}} dan {{max}} detik."
+        "magnetFileSelectionTimeoutInvalid": "Masukkan bilangan bulat antara {{min}} dan {{max}} detik.",
+        "mediaSelectionSkipSingleDialog": "Download single-part media directly",
+        "mediaSelectionSkipSingleDialogDesc": "When enabled, a single part downloads at the chosen quality without opening the picker.",
+        "mediaSelectionHighest": "Highest"
       },
       "seeding": {
         "title": "Seeding",

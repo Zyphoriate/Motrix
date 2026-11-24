@@ -1,4 +1,17 @@
 {
+  "mediaSelection": {
+    "title": "Velg videoer",
+    "selectAll": "Velg alle",
+    "selectNone": "Fjern alle valg",
+    "selected": "{{selected}} av {{total}} valgt",
+    "part": "Del {{number}}",
+    "quality": "Kvalitet",
+    "download": "Last ned valgte",
+    "inspectFailed": "Kunne ikke laste videoer. Prøv igjen.",
+    "createFailed": "Kunne ikke opprette nedlastinger. Prøv igjen.",
+    "entryFailed": "{{title}}: {{reason}}",
+    "highest": "Highest"
+  },
   "applicationMenu": {
     "actionFailed": "Handlingen kunne ikke fullføres. Kontroller tilkoblingen og prøv igjen.",
     "back": "Tilbake",
@@ -2005,7 +2018,10 @@
         "magnetFileSelectionTimeoutInvalid": "Skriv inn et heltall fra {{min}} til {{max}} sekunder.",
         "magnetFileSelectionTimeoutSeconds": "Tid til å velge filer (s)",
         "magnetFileSelectionTimeoutSecondsDesc": "Starter når fillisten er klar. Endringer gjelder også oppgaver som allerede venter.",
-        "title": "Noder"
+        "title": "Noder",
+        "mediaSelectionSkipSingleDialog": "Download single-part media directly",
+        "mediaSelectionSkipSingleDialogDesc": "When enabled, a single part downloads at the chosen quality without opening the picker.",
+        "mediaSelectionHighest": "Highest"
       },
       "seeding": {
         "seedRatio": "Grense for delingsforhold",

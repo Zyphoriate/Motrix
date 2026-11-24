@@ -1,4 +1,17 @@
 {
+  "mediaSelection": {
+    "title": "Videoları seç",
+    "selectAll": "Tümünü seç",
+    "selectNone": "Seçimi temizle",
+    "selected": "{{total}} öğeden {{selected}} seçildi",
+    "part": "Bölüm {{number}}",
+    "quality": "Kalite",
+    "download": "Seçilenleri indir",
+    "inspectFailed": "Videolar yüklenemedi. Tekrar deneyin.",
+    "createFailed": "İndirmeler oluşturulamadı. Tekrar deneyin.",
+    "entryFailed": "{{title}}: {{reason}}",
+    "highest": "Highest"
+  },
   "operatorUnlock": {
     "title": "Motrix’in kilidini aç",
     "help": "Bu sunucu operatör belirteci gerektirir. Sunucu makinesinde MOTRIX_OPERATOR_TOKEN değişkenini ayarlayın veya <dataDir>/operator-token dosyasındaki belirteci okuyup aşağıya yapıştırın.",
@@ -1606,7 +1619,10 @@
         "magnetFileSelectionAutoDownloadDesc": "Uygulama penceresi veya tarayıcı kapalı olsa bile aşağıdaki sürenin sonunda başlar.",
         "magnetFileSelectionTimeoutSeconds": "Dosya seçme süresi (sn)",
         "magnetFileSelectionTimeoutSecondsDesc": "Dosya listesi hazır olduğunda başlar. Değişiklikler hâlihazırda bekleyen görevlere de uygulanır.",
-        "magnetFileSelectionTimeoutInvalid": "{{min}} ile {{max}} saniye arasında bir tam sayı girin."
+        "magnetFileSelectionTimeoutInvalid": "{{min}} ile {{max}} saniye arasında bir tam sayı girin.",
+        "mediaSelectionSkipSingleDialog": "Download single-part media directly",
+        "mediaSelectionSkipSingleDialogDesc": "When enabled, a single part downloads at the chosen quality without opening the picker.",
+        "mediaSelectionHighest": "Highest"
       },
       "seeding": {
         "title": "Paylaşım",

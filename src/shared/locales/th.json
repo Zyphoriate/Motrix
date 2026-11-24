@@ -1,4 +1,17 @@
 {
+  "mediaSelection": {
+    "title": "เลือกวิดีโอ",
+    "selectAll": "เลือกทั้งหมด",
+    "selectNone": "ยกเลิกทั้งหมด",
+    "selected": "เลือก {{selected}} จาก {{total}}",
+    "part": "ตอนที่ {{number}}",
+    "quality": "คุณภาพ",
+    "download": "ดาวน์โหลดที่เลือก",
+    "inspectFailed": "ไม่สามารถโหลดวิดีโอได้ โปรดลองอีกครั้ง",
+    "createFailed": "ไม่สามารถสร้างการดาวน์โหลดได้ โปรดลองอีกครั้ง",
+    "entryFailed": "{{title}}: {{reason}}",
+    "highest": "Highest"
+  },
   "applicationMenu": {
     "actionFailed": "ดำเนินการไม่สำเร็จ ตรวจสอบการเชื่อมต่อแล้วลองอีกครั้ง",
     "back": "ย้อนกลับ",
@@ -1986,7 +1999,10 @@
         "magnetFileSelectionTimeoutInvalid": "ป้อนจำนวนเต็มตั้งแต่ {{min}} ถึง {{max}} วินาที",
         "magnetFileSelectionTimeoutSeconds": "เวลาเลือกไฟล์ (วินาที)",
         "magnetFileSelectionTimeoutSecondsDesc": "เริ่มนับเมื่อรายการไฟล์พร้อม การเปลี่ยนแปลงมีผลกับงานที่รออยู่ด้วย",
-        "title": "เพียร์"
+        "title": "เพียร์",
+        "mediaSelectionSkipSingleDialog": "Download single-part media directly",
+        "mediaSelectionSkipSingleDialogDesc": "When enabled, a single part downloads at the chosen quality without opening the picker.",
+        "mediaSelectionHighest": "Highest"
       },
       "seeding": {
         "seedRatio": "ขีดจำกัดอัตราส่วนการแชร์",

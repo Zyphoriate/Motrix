@@ -1,16 +1,9 @@
-import fs from 'node:fs'
-import path from 'node:path'
 import type { BridgeEventBus } from '@core/bridge/bridge-event-bus'
 import { IdempotencyCache } from '@core/bridge/idempotency-cache'
 import type { MdxpSessionContext } from '@core/bridge/mdxp-session-context'
 import type { SegmentAria2 } from '@core/download/segment-downloader'
-import { SegmentDownloader } from '@core/download/segment-downloader'
-import { FfmpegService } from '@core/ffmpeg/ffmpeg-service'
 import { newTaskId } from '@core/lib/ids'
-import { fetchManifest } from '@core/media/manifest-fetcher'
-import { assembleSegments } from '@core/media/segment-assembler'
-import { SegmentDecryptor } from '@core/media/segment-decryptor'
-import { MediaTaskCoordinator } from '@core/task/media-task-coordinator'
+import type { MediaTaskCoordinator } from '@core/task/media-task-coordinator'
 import type { TaskManager } from '@core/task/task-manager'
 import {
   type DownloadSubmitParams,
@@ -24,11 +17,12 @@ import type { TaskActivityRecorder } from '@shared/types/task-activity'
 import type { BridgeErrorCode } from './errors'
 import { BridgeReceiverError } from './errors'
 import { stripHopByHopHeaders } from './header-replay'
+import { MediaTaskRuntime } from './media-task-runtime'
 import { DirectPipeline } from './pipelines/direct-pipeline'
-import { HlsDashPipeline } from './pipelines/hls-dash-pipeline'
+import type { HlsDashPipeline } from './pipelines/hls-dash-pipeline'
 import { MagnetPipeline } from './pipelines/magnet-pipeline'
 import { ensureMediaExtension } from './pipelines/media-final-name'
-import { MuxPipeline } from './pipelines/mux-pipeline'
+import type { MuxPipeline } from './pipelines/mux-pipeline'
 import {
   dispatchTaskUpdates,
   type TaskNotificationSink,
@@ -53,6 +47,8 @@ export function serializeCookieHeader(
 }
 
 export interface BridgeReceiverDeps {
+  /** Shared host runtime; its lifetime is independent of this listener. */
+  mediaRuntime?: MediaTaskRuntime
   mediaMetaStore: ConstructorParameters<
     typeof MediaTaskCoordinator
   >[0]['mediaMetaStore']
@@ -214,62 +210,14 @@ export class BridgeReceiver {
     })
     this.publisher = new ProgressPublisher(deps.bridgeBus, deps.localize)
 
-    if (deps.resolveFfmpegBinaryPath || deps.ffmpegBinaryPath !== null) {
-      const resolveFfmpegBinaryPath =
-        deps.resolveFfmpegBinaryPath ??
-        (() => Promise.resolve(deps.ffmpegBinaryPath))
-      const assertFfmpegAvailable = async () => {
-        if (!(await resolveFfmpegBinaryPath())) {
-          throw new BridgeReceiverError(
-            'unsupported-kind',
-            'ffmpeg is unavailable; configure it in Settings and retry'
-          )
-        }
-      }
-      const eventBusWithEmit = deps.eventBus as {
-        on(event: string, listener: (payload: unknown) => void): unknown
-        off(event: string, listener: (payload: unknown) => void): unknown
-        emit(event: string, payload: unknown): void
-      }
-      const tmpRoot = deps.tmpRoot
-      const coordinator = new MediaTaskCoordinator({
-        mediaMetaStore: deps.mediaMetaStore,
-        taskManager: deps.taskManager,
-        activityRecorder: deps.activityRecorder,
-        eventBus: eventBusWithEmit,
-        publishTaskUpdate: deps.publishTaskUpdate,
-        publishTaskUpdateNow: deps.publishTaskUpdateNow,
-        resolveFfmpegBinaryPath,
-        pickName: deps.pickName,
-        persist: deps.persistTask,
-        persistTaskWithOccurrence: deps.persistTaskWithOccurrence,
-        occurrenceDispatcher: deps.occurrenceDispatcher,
-        parentTaskCreated: deps.parentTaskCreated,
-        recordTransition: deps.recordTransition,
-        runTaskMutation: deps.runTaskMutation,
-        makeDownloader: (tmpDir: string) =>
-          new SegmentDownloader({ aria2: deps.segmentAria2, tmpDir }),
-        decryptor: new SegmentDecryptor(),
-        assemble: assembleSegments,
-        makeFfmpeg: () => new FfmpegService(),
-        mkdtemp: async () => {
-          // mkdtemp requires its PARENT to exist. tmpRoot (app temp/motrix-media)
-          // is not created anywhere else, so ensure it first — otherwise the
-          // first mux/hls/dash task fails with ENOENT on mkdtemp.
-          await fs.promises.mkdir(tmpRoot, { recursive: true })
-          const base = path.join(tmpRoot, 'motrix-media-')
-          return fs.promises.mkdtemp(base)
-        },
-      })
-      this.coordinator = coordinator
-      const resolvedFetchManifest = deps.fetchManifest ?? fetchManifest
-      this.hlsDash = new HlsDashPipeline({
-        fetchManifest: resolvedFetchManifest,
-        coordinator,
-        assertFfmpegAvailable,
-      })
-      this.mux = new MuxPipeline({ coordinator, assertFfmpegAvailable })
-    }
+    const mediaRuntime =
+      deps.mediaRuntime ??
+      (deps.resolveFfmpegBinaryPath || deps.ffmpegBinaryPath !== null
+        ? new MediaTaskRuntime(deps)
+        : undefined)
+    this.coordinator = mediaRuntime?.coordinator
+    this.hlsDash = mediaRuntime?.hlsDashPipeline
+    this.mux = mediaRuntime?.muxPipeline
   }
 
   /**
@@ -477,13 +425,13 @@ export class BridgeReceiver {
   }
 
   /**
-   * Stop publishing and cancel/drain every coordinator-owned media run.
-   * Direct/aria2 downloads remain owned by the engine lifecycle; only the
-   * long-lived HLS/DASH/mux processes created by this receiver are joined here.
+   * Stop publishing and drain media runs when this receiver owns the runtime.
+   * An injected host runtime survives listener shutdown and is drained by the
+   * shell alongside the engine and session lifecycle.
    */
   async stopAndDrain(): Promise<void> {
     this.stop()
-    await this.coordinator?.stopAndDrain()
+    if (!this.deps.mediaRuntime) await this.coordinator?.stopAndDrain()
   }
 
   /** Extension-initiated cancel. `taskId` is the MDXP public id

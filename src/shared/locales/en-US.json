@@ -1,4 +1,17 @@
 {
+  "mediaSelection": {
+    "title": "Choose videos",
+    "selectAll": "Select all",
+    "selectNone": "Select none",
+    "selected": "{{selected}} of {{total}} selected",
+    "part": "Part {{number}}",
+    "quality": "Quality",
+    "download": "Download selected",
+    "inspectFailed": "Unable to load videos. Try again.",
+    "createFailed": "Unable to create downloads. Try again.",
+    "entryFailed": "{{title}}: {{reason}}",
+    "highest": "Highest"
+  },
   "operatorUnlock": {
     "title": "Sign in to Motrix",
     "help": "For first-time access or a forgotten password, contact the server administrator.",
@@ -1606,7 +1619,10 @@
         "magnetFileSelectionAutoDownloadDesc": "Starts after the time below, even if the app window or browser is closed.",
         "magnetFileSelectionTimeoutSeconds": "Time to choose files (s)",
         "magnetFileSelectionTimeoutSecondsDesc": "Starts when the file list is ready. Changes also apply to tasks already waiting.",
-        "magnetFileSelectionTimeoutInvalid": "Enter a whole number from {{min}} to {{max}} seconds."
+        "magnetFileSelectionTimeoutInvalid": "Enter a whole number from {{min}} to {{max}} seconds.",
+        "mediaSelectionSkipSingleDialog": "Download single-part media directly",
+        "mediaSelectionSkipSingleDialogDesc": "When enabled, a single part downloads at the chosen quality without opening the picker.",
+        "mediaSelectionHighest": "Highest"
       },
       "seeding": {
         "title": "Seeding",

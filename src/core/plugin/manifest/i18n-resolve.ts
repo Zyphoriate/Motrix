@@ -65,6 +65,14 @@ function walkSchemaNode(
   if (typeof node.description === 'string') {
     out.description = resolveOne(node.description, opts)
   }
+  if (node.enumLabels) {
+    out.enumLabels = Object.fromEntries(
+      Object.entries(node.enumLabels).map(([value, label]) => [
+        value,
+        resolveOne(label, opts),
+      ])
+    )
+  }
   if (node.properties) {
     const props: Record<string, JsonSchemaNode> = {}
     for (const [k, v] of Object.entries(node.properties)) {

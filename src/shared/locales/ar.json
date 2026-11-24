@@ -1,4 +1,17 @@
 {
+  "mediaSelection": {
+    "title": "اختيار الفيديوهات",
+    "selectAll": "تحديد الكل",
+    "selectNone": "إلغاء تحديد الكل",
+    "selected": "تم تحديد {{selected}} من {{total}}",
+    "part": "الجزء {{number}}",
+    "quality": "الجودة",
+    "download": "تنزيل المحدد",
+    "inspectFailed": "تعذر تحميل الفيديوهات. حاول مجددًا.",
+    "createFailed": "تعذر إنشاء التنزيلات. حاول مجددًا.",
+    "entryFailed": "{{title}}: {{reason}}",
+    "highest": "Highest"
+  },
   "applicationMenu": {
     "actionFailed": "تعذّر إكمال الإجراء. تحقق من الاتصال وحاول مجددًا.",
     "back": "رجوع",
@@ -2081,7 +2094,10 @@
         "magnetFileSelectionTimeoutInvalid": "أدخل عددًا صحيحًا من {{min}} إلى {{max}} ثانية.",
         "magnetFileSelectionTimeoutSeconds": "مهلة اختيار الملفات (ث)",
         "magnetFileSelectionTimeoutSecondsDesc": "تبدأ عند جاهزية قائمة الملفات. تنطبق التغييرات أيضًا على المهام المنتظرة بالفعل.",
-        "title": "الأقران"
+        "title": "الأقران",
+        "mediaSelectionSkipSingleDialog": "Download single-part media directly",
+        "mediaSelectionSkipSingleDialogDesc": "When enabled, a single part downloads at the chosen quality without opening the picker.",
+        "mediaSelectionHighest": "Highest"
       },
       "seeding": {
         "seedRatio": "حد نسبة المشاركة",

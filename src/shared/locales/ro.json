@@ -1,4 +1,17 @@
 {
+  "mediaSelection": {
+    "title": "Alege videoclipuri",
+    "selectAll": "Selectează tot",
+    "selectNone": "Deselectează tot",
+    "selected": "{{selected}} din {{total}} selectate",
+    "part": "Partea {{number}}",
+    "quality": "Calitate",
+    "download": "Descarcă selecția",
+    "inspectFailed": "Videoclipurile nu pot fi încărcate. Încearcă din nou.",
+    "createFailed": "Descărcările nu pot fi create. Încearcă din nou.",
+    "entryFailed": "{{title}}: {{reason}}",
+    "highest": "Highest"
+  },
   "applicationMenu": {
     "actionFailed": "Acțiunea nu a putut fi finalizată. Verifică conexiunea și încearcă din nou.",
     "back": "Înapoi",
@@ -2024,7 +2037,10 @@
         "magnetFileSelectionTimeoutInvalid": "Introdu un număr întreg de secunde între {{min}} și {{max}}.",
         "magnetFileSelectionTimeoutSeconds": "Timp pentru alegerea fișierelor (s)",
         "magnetFileSelectionTimeoutSecondsDesc": "Începe când lista fișierelor este pregătită. Modificările se aplică și sarcinilor aflate deja în așteptare.",
-        "title": "Parteneri"
+        "title": "Parteneri",
+        "mediaSelectionSkipSingleDialog": "Download single-part media directly",
+        "mediaSelectionSkipSingleDialogDesc": "When enabled, a single part downloads at the chosen quality without opening the picker.",
+        "mediaSelectionHighest": "Highest"
       },
       "seeding": {
         "seedRatio": "Limită a raportului de partajare",

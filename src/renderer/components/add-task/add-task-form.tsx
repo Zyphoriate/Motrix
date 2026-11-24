@@ -83,6 +83,7 @@ import {
   type TorrentQueueUpdate,
   useExternalHydration,
 } from './use-external-hydration'
+import { useMediaSelection } from './use-media-selection'
 
 interface AddTaskFormProps {
   /** Re-download forms use HTTP fields and create a separate task. */
@@ -195,13 +196,6 @@ export function AddTaskForm({
   })
 
   const dirty = form.formState.isDirty
-  // Publish draft protection before the next key can close the host surface.
-  useLayoutEffect(() => {
-    onDraftStateChange?.(
-      dirty,
-      submitting || batchSubmitting || advancingTorrent
-    )
-  }, [dirty, submitting, batchSubmitting, advancingTorrent, onDraftStateChange])
 
   const openHydrationRequest = useRef(0)
 
@@ -419,6 +413,27 @@ export function AddTaskForm({
     [advanceTorrentQueue, form, hasNextQueuedTorrent, onSubmitSuccess]
   )
 
+  const mediaSelection = useMediaSelection(
+    form,
+    active,
+    completeCurrentSubmission
+  )
+  const submissionLock = useRef(false)
+  // Publish draft protection before the next key can close the host surface.
+  useLayoutEffect(() => {
+    onDraftStateChange?.(
+      dirty,
+      submitting || batchSubmitting || advancingTorrent || mediaSelection.busy
+    )
+  }, [
+    dirty,
+    submitting,
+    batchSubmitting,
+    advancingTorrent,
+    mediaSelection.busy,
+    onDraftStateChange,
+  ])
+
   const handleCancel = useCallback(async () => {
     if (hasNextQueuedTorrent()) {
       if (await advanceTorrentQueue()) return
@@ -537,12 +552,22 @@ export function AddTaskForm({
 
   const onSubmit = useCallback(
     async (values: AddTaskFormValues) => {
-      if (!active || submitting || advancingTorrent || batchSubmitting) return
+      if (
+        !active ||
+        submissionLock.current ||
+        submitting ||
+        advancingTorrent ||
+        batchSubmitting ||
+        mediaSelection.open
+      )
+        return
+      submissionLock.current = true
       setSubmitting(true)
       try {
         form.clearErrors('urls')
         form.clearErrors('root.torrentSubmission')
         const requests = formValuesToTaskCreateRequests(values)
+        if (await mediaSelection.inspect(values, requests)) return
         const lines = values.tab === 'links' ? parseUrlLines(values.urls) : []
         const validLines = lines.filter((line) => line.valid)
         const unused = [
@@ -676,10 +701,13 @@ export function AddTaskForm({
           )
         }
       } finally {
+        submissionLock.current = false
         setSubmitting(false)
       }
     },
     [
+      mediaSelection.inspect,
+      mediaSelection.open,
       active,
       advancingTorrent,
       batchSubmitting,
@@ -835,10 +863,16 @@ export function AddTaskForm({
             onCancel={() => void handleCancel()}
             onDownloadAll={handleDownloadAllTorrents}
             onSubmit={() => void form.handleSubmit(onSubmit)()}
-            submitting={submitting || advancingTorrent || batchSubmitting}
+            submitting={
+              submitting ||
+              advancingTorrent ||
+              batchSubmitting ||
+              mediaSelection.open
+            }
             torrentQueue={torrentQueue}
           />
         </div>
+        {mediaSelection.dialog}
         <AlertDialog
           open={duplicateConflict !== null}
           onOpenChange={(open) => !open && setDuplicateConflict(null)}

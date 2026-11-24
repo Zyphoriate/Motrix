@@ -1,4 +1,17 @@
 {
+  "mediaSelection": {
+    "title": "Chọn video",
+    "selectAll": "Chọn tất cả",
+    "selectNone": "Bỏ chọn tất cả",
+    "selected": "Đã chọn {{selected}} / {{total}}",
+    "part": "Phần {{number}}",
+    "quality": "Chất lượng",
+    "download": "Tải mục đã chọn",
+    "inspectFailed": "Không thể tải video. Hãy thử lại.",
+    "createFailed": "Không thể tạo lượt tải. Hãy thử lại.",
+    "entryFailed": "{{title}}: {{reason}}",
+    "highest": "Highest"
+  },
   "operatorUnlock": {
     "title": "Mở khóa Motrix",
     "help": "Máy chủ này yêu cầu token quản trị. Trên máy chủ, đặt MOTRIX_OPERATOR_TOKEN hoặc đọc token từ <dataDir>/operator-token rồi dán vào bên dưới.",
@@ -1592,7 +1605,10 @@
         "magnetFileSelectionAutoDownloadDesc": "Bắt đầu sau khoảng thời gian bên dưới, ngay cả khi cửa sổ ứng dụng hoặc trình duyệt đã đóng.",
         "magnetFileSelectionTimeoutSeconds": "Thời gian chọn tệp (giây)",
         "magnetFileSelectionTimeoutSecondsDesc": "Thời gian chờ bắt đầu khi danh sách tệp sẵn sàng. Thay đổi cũng áp dụng cho các tác vụ đang chờ.",
-        "magnetFileSelectionTimeoutInvalid": "Nhập một số nguyên từ {{min}} đến {{max}} giây."
+        "magnetFileSelectionTimeoutInvalid": "Nhập một số nguyên từ {{min}} đến {{max}} giây.",
+        "mediaSelectionSkipSingleDialog": "Download single-part media directly",
+        "mediaSelectionSkipSingleDialogDesc": "When enabled, a single part downloads at the chosen quality without opening the picker.",
+        "mediaSelectionHighest": "Highest"
       },
       "seeding": {
         "title": "Chia sẻ",

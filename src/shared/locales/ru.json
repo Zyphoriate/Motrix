@@ -1,4 +1,17 @@
 {
+  "mediaSelection": {
+    "title": "Выберите видео",
+    "selectAll": "Выбрать всё",
+    "selectNone": "Снять выбор",
+    "selected": "Выбрано {{selected}} из {{total}}",
+    "part": "Часть {{number}}",
+    "quality": "Качество",
+    "download": "Скачать выбранное",
+    "inspectFailed": "Не удалось загрузить видео. Повторите попытку.",
+    "createFailed": "Не удалось создать загрузки. Повторите попытку.",
+    "entryFailed": "{{title}}: {{reason}}",
+    "highest": "Highest"
+  },
   "operatorUnlock": {
     "title": "Разблокировать Motrix",
     "help": "Для этого сервера требуется токен оператора. На хосте задайте MOTRIX_OPERATOR_TOKEN или прочитайте токен из <dataDir>/operator-token, затем вставьте его ниже.",
@@ -1634,7 +1647,10 @@
         "magnetFileSelectionAutoDownloadDesc": "Загрузка начнётся через указанное ниже время, даже если окно приложения или браузер закрыты.",
         "magnetFileSelectionTimeoutSeconds": "Время на выбор файлов (с)",
         "magnetFileSelectionTimeoutSecondsDesc": "Отсчёт начинается, когда список файлов готов. Изменения также применяются к уже ожидающим задачам.",
-        "magnetFileSelectionTimeoutInvalid": "Введите целое число от {{min}} до {{max}} секунд."
+        "magnetFileSelectionTimeoutInvalid": "Введите целое число от {{min}} до {{max}} секунд.",
+        "mediaSelectionSkipSingleDialog": "Download single-part media directly",
+        "mediaSelectionSkipSingleDialogDesc": "When enabled, a single part downloads at the chosen quality without opening the picker.",
+        "mediaSelectionHighest": "Highest"
       },
       "seeding": {
         "title": "Раздача",
