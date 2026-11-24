@@ -133,6 +133,7 @@ describe('<NotificationsNavItem>', () => {
     mockInvoke(7, 'dot')
     renderNavItem()
     const dot = await screen.findByTestId('notification-badge-dot')
+    expect(dot).toHaveClass('bg-emerald-600')
     expect(dot).toHaveAttribute('role', 'status')
     expect(dot).toHaveAttribute('aria-label', 'Unread notifications')
     expect(dot).not.toHaveAttribute('aria-hidden')
@@ -251,8 +252,11 @@ describe('<NotificationsNavItem>', () => {
   it('shows the exact unread count under the cap', async () => {
     mockInvoke(7)
     renderNavItem()
-    expect(await screen.findByTestId('notification-badge')).toHaveTextContent(
-      '7'
+    const badge = await screen.findByTestId('notification-badge')
+    expect(badge).toHaveTextContent('7')
+    expect(badge).toHaveClass('bg-emerald-600')
+    expect(screen.getByTestId('notification-badge-dot')).toHaveClass(
+      'bg-emerald-600'
     )
   })
 

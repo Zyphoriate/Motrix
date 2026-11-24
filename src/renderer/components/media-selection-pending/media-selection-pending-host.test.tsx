@@ -171,6 +171,25 @@ describe('pending media global host', () => {
     await screen.findByText('Selection waiting')
   })
 
+  it('opens an explicitly requested picker while the non-modal inspector remains open', async () => {
+    const inspector = document.createElement('div')
+    inspector.setAttribute('role', 'dialog')
+    inspector.setAttribute('data-inspector-drawer', 'true')
+    document.body.append(inspector)
+    try {
+      render(<MediaSelectionPendingHost />)
+      await act(async () => {})
+      mocks.pending = ['00000000-0000-4000-8000-000000000003']
+      act(() => requestPendingMediaSelection(mocks.pending[0]!))
+      act(changed)
+      await screen.findByText('Selection waiting')
+      expect(inspector.isConnected).toBe(true)
+      expect(screen.getAllByRole('dialog')).toHaveLength(2)
+    } finally {
+      inspector.remove()
+    }
+  })
+
   it('retains failed entries after partial confirmation and closes after retry', async () => {
     mocks.pending = ['00000000-0000-4000-8000-000000000004']
     render(<MediaSelectionPendingHost />)
