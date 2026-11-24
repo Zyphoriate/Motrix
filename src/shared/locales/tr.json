@@ -3043,6 +3043,7 @@
     "center": {
       "title": "Bildirimler",
       "markAllRead": "Tümünü okundu olarak işaretle",
+      "clearOrdinary": "Clear ordinary notifications",
       "clearAll": "Temizle",
       "empty": "Bildirim yok",
       "emptyDesc": "İndirme etkinliği ve önemli uygulama bildirimleri burada görünür",

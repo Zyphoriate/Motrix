@@ -294,6 +294,7 @@
       "empty": "Aucune notification",
       "emptyDesc": "L’activité des téléchargements et les avis importants de l’application apparaîtront ici",
       "markAllRead": "Tout marquer comme lu",
+      "clearOrdinary": "Clear ordinary notifications",
       "markRead": "Marquer comme lue",
       "openTaskFailed": "Impossible d’ouvrir la tâche. Réessayez.",
       "removeAria": "Supprimer {{title}}",

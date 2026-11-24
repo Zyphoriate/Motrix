@@ -3043,6 +3043,7 @@
     "center": {
       "title": "Értesítések",
       "markAllRead": "Összes megjelölése olvasottként",
+      "clearOrdinary": "Clear ordinary notifications",
       "clearAll": "Törlés",
       "empty": "Nincsenek értesítések",
       "emptyDesc": "A letöltési tevékenységek és a fontos alkalmazásértesítések itt jelennek meg",

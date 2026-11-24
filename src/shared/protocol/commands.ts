@@ -1,4 +1,5 @@
 export const Commands = {
+  ClearOrdinaryNotifications: 'command:clearOrdinaryNotifications',
   ConfirmPendingMediaSelection: 'command:confirmPendingMediaSelection',
   CancelPendingMediaSelection: 'command:cancelPendingMediaSelection',
   InspectPluginMedia: 'command:inspectPluginMedia',

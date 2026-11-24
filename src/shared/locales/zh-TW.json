@@ -2592,6 +2592,7 @@
     "center": {
       "title": "通知",
       "markAllRead": "全部標示為已讀",
+      "clearOrdinary": "清除一般通知",
       "clearAll": "清除",
       "empty": "沒有通知",
       "emptyDesc": "下載活動和重要應用程式通知會顯示在這裡",

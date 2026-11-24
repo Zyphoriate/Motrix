@@ -3085,6 +3085,7 @@
     "center": {
       "title": "Powiadomienia",
       "markAllRead": "Oznacz wszystkie jako przeczytane",
+      "clearOrdinary": "Clear ordinary notifications",
       "clearAll": "Wyczyść",
       "empty": "Brak powiadomień",
       "emptyDesc": "Tutaj pojawią się informacje o pobieraniu i ważne komunikaty aplikacji",

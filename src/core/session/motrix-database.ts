@@ -1258,6 +1258,13 @@ export class MotrixDatabase {
     }
   }
 
+  getNotification(id: string): AppNotification | null {
+    const row = this.db
+      .prepare('SELECT * FROM notifications WHERE id = ?')
+      .get(id) as RawNotificationRow | undefined
+    return row ? mapNotificationRow(row) : null
+  }
+
   /** Display rows, newest first. Malformed `title_params`/`body_params`
    *  JSON on disk reads back as `null` (validate-on-read) rather than
    *  throwing or trusting an unreadable value. */
@@ -1295,6 +1302,23 @@ export class MotrixDatabase {
 
   deleteNotification(id: string): boolean {
     return this.stmtDeleteNotification.run(id).changes > 0
+  }
+
+  snapshotNotificationIds(hiddenKinds: readonly string[] = []): string[] {
+    const rows = this.db
+      .prepare(
+        'SELECT id FROM notifications WHERE kind NOT IN (SELECT value FROM json_each(?))'
+      )
+      .all(JSON.stringify(hiddenKinds)) as { id: string }[]
+    return rows.map((row) => row.id)
+  }
+
+  clearNotificationSnapshot(ids: readonly string[]): number {
+    return this.db
+      .prepare(
+        'DELETE FROM notifications WHERE id IN (SELECT value FROM json_each(?))'
+      )
+      .run(JSON.stringify(ids)).changes
   }
 
   /** Display table only — the ledger (`notification_occurrences`) is

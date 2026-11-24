@@ -294,6 +294,7 @@
       "empty": "اعلانی وجود ندارد",
       "emptyDesc": "فعالیت دانلودها و اطلاعیه‌های مهم برنامه اینجا نمایش داده می‌شوند",
       "markAllRead": "علامت‌گذاری همه به‌عنوان خوانده‌شده",
+      "clearOrdinary": "Clear ordinary notifications",
       "markRead": "علامت‌گذاری به‌عنوان خوانده‌شده",
       "openTaskFailed": "باز کردن کار ممکن نشد. دوباره تلاش کنید.",
       "removeAria": "حذف {{title}}",

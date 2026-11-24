@@ -294,6 +294,7 @@
       "empty": "Ingen varsler",
       "emptyDesc": "Nedlastingsaktivitet og viktige meldinger fra appen vises her",
       "markAllRead": "Merk alle som lest",
+      "clearOrdinary": "Clear ordinary notifications",
       "markRead": "Merk som lest",
       "openTaskFailed": "Kunne ikke åpne oppgaven. Prøv igjen.",
       "removeAria": "Fjern {{title}}",

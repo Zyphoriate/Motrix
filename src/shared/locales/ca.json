@@ -294,6 +294,7 @@
       "empty": "No hi ha notificacions",
       "emptyDesc": "Aquí es mostrarà l'activitat de les baixades i els avisos importants de l'aplicació",
       "markAllRead": "Marcar-les totes com a llegides",
+      "clearOrdinary": "Clear ordinary notifications",
       "markRead": "Marcar com a llegida",
       "openTaskFailed": "No s'ha pogut obrir la tasca. Torneu-ho a provar.",
       "removeAria": "Suprimir {{title}}",

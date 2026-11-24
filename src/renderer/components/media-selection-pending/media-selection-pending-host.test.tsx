@@ -125,20 +125,29 @@ beforeEach(() => {
 })
 
 describe('pending media global host', () => {
-  it('subscribes before the mount snapshot and opens an offline-enqueued selection', async () => {
+  it('subscribes before the mount snapshot without opening an offline-enqueued selection', async () => {
     mocks.pending = ['00000000-0000-4000-8000-000000000001']
     render(<MediaSelectionPendingHost />)
+    await act(async () => {})
+    expect(screen.queryByRole('dialog')).toBeNull()
+    expect(transport.invoke).not.toHaveBeenCalledWith(
+      Queries.GetPendingMediaSelection,
+      expect.anything()
+    )
+    act(() => requestPendingMediaSelection(mocks.pending[0]!))
     await screen.findByText('Selection offline')
     expect(vi.mocked(transport.on).mock.invocationCallOrder[0]).toBeLessThan(
       vi.mocked(transport.invoke).mock.invocationCallOrder[0]
     )
   })
 
-  it('opens an online enqueue and dismisses only for this page session', async () => {
+  it('keeps online enqueues closed until explicitly requested and allows reopening', async () => {
     render(<MediaSelectionPendingHost />)
     await act(async () => {})
     mocks.pending = ['00000000-0000-4000-8000-000000000002']
-    act(changed)
+    await act(async () => changed())
+    expect(screen.queryByRole('dialog')).toBeNull()
+    act(() => requestPendingMediaSelection(mocks.pending[0]!))
     await screen.findByText('Selection online')
     fireEvent.click(screen.getByText('Dismiss'))
     act(changed)
@@ -158,6 +167,7 @@ describe('pending media global host', () => {
   it('waits for AddTaskForm and other active dialogs before opening', async () => {
     useAddTaskDialogStore.setState({ open: true })
     mocks.pending = ['00000000-0000-4000-8000-000000000003']
+    requestPendingMediaSelection(mocks.pending[0]!)
     render(<MediaSelectionPendingHost />)
     await act(async () => {})
     expect(screen.queryByRole('dialog')).toBeNull()
@@ -180,8 +190,8 @@ describe('pending media global host', () => {
       render(<MediaSelectionPendingHost />)
       await act(async () => {})
       mocks.pending = ['00000000-0000-4000-8000-000000000003']
+      await act(async () => changed())
       act(() => requestPendingMediaSelection(mocks.pending[0]!))
-      act(changed)
       await screen.findByText('Selection waiting')
       expect(inspector.isConnected).toBe(true)
       expect(screen.getAllByRole('dialog')).toHaveLength(2)
@@ -192,6 +202,7 @@ describe('pending media global host', () => {
 
   it('retains failed entries after partial confirmation and closes after retry', async () => {
     mocks.pending = ['00000000-0000-4000-8000-000000000004']
+    requestPendingMediaSelection(mocks.pending[0]!)
     render(<MediaSelectionPendingHost />)
     await screen.findByText('Selection partial')
     vi.mocked(transport.invoke).mockImplementationOnce(async () => ({
@@ -216,6 +227,7 @@ describe('pending media global host', () => {
 
   it('closes a selection settled by another client and refreshes on reconnect', async () => {
     mocks.pending = ['00000000-0000-4000-8000-000000000005']
+    requestPendingMediaSelection(mocks.pending[0]!)
     render(<MediaSelectionPendingHost />)
     await screen.findByText('Selection remote')
     mocks.pending = []
@@ -223,11 +235,15 @@ describe('pending media global host', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
     mocks.pending = ['00000000-0000-4000-8000-000000000006']
     act(() => mocks.connection?.({ state: 'connected' }))
+    await act(async () => {})
+    expect(screen.queryByRole('dialog')).toBeNull()
+    act(() => requestPendingMediaSelection(mocks.pending[0]!))
     await screen.findByText('Selection reconnected')
   })
 
   it('converges after a provider failure emits one changed-error event', async () => {
     mocks.pending = ['00000000-0000-4000-8000-000000000005']
+    requestPendingMediaSelection(mocks.pending[0]!)
     render(<MediaSelectionPendingHost />)
     await screen.findByText('Selection remote')
     const original = vi.mocked(transport.invoke).getMockImplementation()!
@@ -255,6 +271,7 @@ describe('pending media global host', () => {
 
   it('drops a delayed preview rather than covering a newly opened form', async () => {
     mocks.pending = ['00000000-0000-4000-8000-000000000007']
+    requestPendingMediaSelection(mocks.pending[0]!)
     let resolve!: (value: unknown) => void
     const original = vi.mocked(transport.invoke).getMockImplementation()!
     vi.mocked(transport.invoke).mockImplementation((channel, ...args) =>

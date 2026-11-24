@@ -1,4 +1,5 @@
 import { NotificationCenter } from '@core/notifications/notification-center'
+import type { PendingMediaSelectionService } from '@core/plugin/pending-media-selection-service'
 import { MotrixDatabase } from '@core/session/motrix-database'
 import { Commands } from '@shared/protocol/commands'
 import { Queries } from '@shared/protocol/queries'
@@ -134,12 +135,136 @@ describe('notification center IPC (main)', () => {
     await expect(handlers[Queries.ListNotifications]?.()).resolves.toEqual([])
   })
 
-  it('registers and removes exactly the 6 notification channels', () => {
+  it('clears ordinary rows, including read rows beyond the default page, and retains media choices', async () => {
+    notificationCenter.notify({
+      sourceKey: 'pending',
+      kind: 'media-selection-required',
+      severity: 'warning',
+      titleKey: 'title',
+      taskId: 'pending-task',
+    })
+    for (let index = 0; index < 110; index++) {
+      notificationCenter.notify({
+        sourceKey: `ordinary-${index}`,
+        kind: 'task-error',
+        severity: 'error',
+        titleKey: 'title',
+      })
+    }
+    notificationCenter.markRead(notificationCenter.list()[0].id)
+    const handlers = buildNotificationHandlers({ notificationCenter })
+    await expect(
+      handlers[Commands.ClearOrdinaryNotifications]?.()
+    ).resolves.toBe(110)
+    expect(notificationCenter.list()).toEqual([
+      expect.objectContaining({ kind: 'media-selection-required' }),
+    ])
+  })
+
+  it('awaits pending cancellation before deleting a media choice and preserves it on failure', async () => {
+    notificationCenter.notify({
+      sourceKey: 'pending',
+      kind: 'media-selection-required',
+      severity: 'warning',
+      titleKey: 'title',
+      taskId: 'pending-task',
+    })
+    const row = notificationCenter.list()[0]
+    const cancel = vi.fn<() => Promise<void>>(async () => {
+      expect(notificationCenter.get(row.id)).not.toBeNull()
+      throw new Error('cancel failed')
+    })
+    const handlers = buildNotificationHandlers({
+      notificationCenter,
+      getPendingMediaSelection: () => ({ list: vi.fn(), cancel }),
+    })
+    await expect(
+      handlers[Commands.DeleteNotification]?.(row.id)
+    ).rejects.toThrow('cancel failed')
+    expect(notificationCenter.get(row.id)).not.toBeNull()
+    cancel.mockImplementation(async () => {})
+    await expect(handlers[Commands.DeleteNotification]?.(row.id)).resolves.toBe(
+      true
+    )
+    expect(cancel).toHaveBeenCalledWith('pending-task')
+  })
+
+  it('cancels every pending choice before clearing and retains notifications on cancellation failure', async () => {
+    notificationCenter.notify({
+      sourceKey: 'ordinary',
+      kind: 'task-error',
+      severity: 'error',
+      titleKey: 'title',
+    })
+    const cancel = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('cancel failed'))
+      .mockResolvedValue(undefined)
+    const list = vi
+      .fn()
+      .mockReturnValue([{ taskId: 'first' }, { taskId: 'second' }])
+    const handlers = buildNotificationHandlers({
+      notificationCenter,
+      getPendingMediaSelection: () => ({ list, cancel }),
+    })
+    await expect(handlers[Commands.ClearNotifications]?.()).rejects.toThrow(
+      'cancel failed'
+    )
+    expect(notificationCenter.list()).toHaveLength(1)
+    await expect(handlers[Commands.ClearNotifications]?.()).resolves.toBe(1)
+    expect(cancel.mock.calls.map(([id]) => id)).toEqual([
+      'first',
+      'first',
+      'second',
+    ])
+  })
+
+  it('clears the full initial snapshot and preserves choices arriving during cancellation', async () => {
+    for (let index = 0; index < 110; index++)
+      notificationCenter.notify({
+        sourceKey: `initial-${index}`,
+        kind: 'task-error',
+        severity: 'error',
+        titleKey: 'title',
+      })
+    let finish!: () => void
+    const waiting = new Promise<void>((resolve) => {
+      finish = resolve
+    })
+    const selections = [{ taskId: 'initial-choice' }]
+    const cancel = vi.fn(async () => waiting)
+    const handlers = buildNotificationHandlers({
+      notificationCenter,
+      getPendingMediaSelection: () => ({
+        list: () =>
+          [...selections] as ReturnType<PendingMediaSelectionService['list']>,
+        cancel,
+      }),
+    })
+    const clearing = handlers[Commands.ClearNotifications]?.()
+    expect(cancel).toHaveBeenCalledWith('initial-choice')
+    selections.push({ taskId: 'new-choice' })
+    notificationCenter.notify({
+      sourceKey: 'new-choice',
+      kind: 'media-selection-required',
+      severity: 'warning',
+      titleKey: 'title',
+      taskId: 'new-choice',
+    })
+    finish()
+    await expect(clearing).resolves.toBe(110)
+    expect(cancel).toHaveBeenCalledTimes(1)
+    expect(notificationCenter.list()).toEqual([
+      expect.objectContaining({ taskId: 'new-choice' }),
+    ])
+  })
+
+  it('registers and removes exactly the 7 notification channels', () => {
     const dispose = registerNotificationIpc({ notificationCenter })
 
-    expect(handle).toHaveBeenCalledTimes(6)
+    expect(handle).toHaveBeenCalledTimes(7)
     dispose()
-    expect(removeHandler).toHaveBeenCalledTimes(6)
+    expect(removeHandler).toHaveBeenCalledTimes(7)
   })
 
   it('routes handler invocations through trackAsyncWork when provided', async () => {

@@ -294,6 +294,7 @@
       "empty": "لا توجد إشعارات",
       "emptyDesc": "سيظهر هنا نشاط التنزيل وإشعارات التطبيق المهمة",
       "markAllRead": "تعليم الكل كمقروء",
+      "clearOrdinary": "Clear ordinary notifications",
       "markRead": "تعليم كمقروء",
       "openTaskFailed": "تعذّر فتح المهمة. حاول مجددًا.",
       "removeAria": "إزالة {{title}}",

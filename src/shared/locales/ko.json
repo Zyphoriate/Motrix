@@ -3022,6 +3022,7 @@
     "center": {
       "title": "알림",
       "markAllRead": "모두 읽음으로 표시",
+      "clearOrdinary": "Clear ordinary notifications",
       "clearAll": "지우기",
       "empty": "알림 없음",
       "emptyDesc": "다운로드 활동과 중요한 앱 알림이 여기에 표시됩니다",

@@ -3085,6 +3085,7 @@
     "center": {
       "title": "Уведомления",
       "markAllRead": "Отметить все как прочитанные",
+      "clearOrdinary": "Clear ordinary notifications",
       "clearAll": "Очистить",
       "empty": "Нет уведомлений",
       "emptyDesc": "Здесь будут отображаться сведения о загрузках и важные сообщения приложения",
