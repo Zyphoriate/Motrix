@@ -17,6 +17,8 @@ export interface NotificationIpcDeps {
     | 'delete'
     | 'clear'
     | 'clearOrdinary'
+    | 'snapshotIds'
+    | 'clearSnapshot'
   >
   getPendingMediaSelection?: () => Pick<
     PendingMediaSelectionService,
@@ -49,9 +51,11 @@ export function buildNotificationHandlers(
     },
     [Commands.ClearNotifications]: async () => {
       const pending = deps.getPendingMediaSelection?.()
-      for (const selection of pending?.list() ?? [])
+      const selections = pending?.list() ?? []
+      const notificationIds = notificationCenter.snapshotIds()
+      for (const selection of selections)
         await pending?.cancel(selection.taskId)
-      return notificationCenter.clear()
+      return notificationCenter.clearSnapshot(notificationIds)
     },
     [Commands.ClearOrdinaryNotifications]: async () =>
       notificationCenter.clearOrdinary(),

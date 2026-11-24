@@ -2464,6 +2464,63 @@ describe('server notification media cancellation', () => {
     }
   })
 
+  it('preserves new choices while clearing the complete initial notification snapshot', async () => {
+    const db = new MotrixDatabase(':memory:')
+    db.init()
+    try {
+      const notificationCenter = new NotificationCenter({
+        store: db,
+        emit: vi.fn(),
+        log: { warn: vi.fn(), error: vi.fn() },
+      })
+      for (let index = 0; index < 110; index++)
+        notificationCenter.notify({
+          sourceKey: `initial-${index}`,
+          kind: 'task-error',
+          severity: 'error',
+          titleKey: 'title',
+        })
+      let finish!: () => void
+      const waiting = new Promise<void>((resolve) => {
+        finish = resolve
+      })
+      const selections = [{ taskId: 'initial-choice' }]
+      const cancel = vi.fn(async () => waiting)
+      const handlers = buildServerCommandHandlers({
+        ...makeFakeCtx(),
+        notificationCenter,
+        motrixDatabase: db,
+        onMediaSelectionReady: (
+          _media: unknown,
+          pending: PendingMediaSelectionService
+        ) => {
+          vi.spyOn(pending, 'cancel').mockImplementation(cancel)
+          vi.spyOn(pending, 'list').mockImplementation(
+            () => [...selections] as ReturnType<typeof pending.list>
+          )
+        },
+      } as unknown as ServerCommandContext)
+      const clearing = handlers[Commands.ClearNotifications]?.()
+      expect(cancel).toHaveBeenCalledWith('initial-choice')
+      selections.push({ taskId: 'new-choice' })
+      notificationCenter.notify({
+        sourceKey: 'new-choice',
+        kind: 'media-selection-required',
+        severity: 'warning',
+        titleKey: 'title',
+        taskId: 'new-choice',
+      })
+      finish()
+      await expect(clearing).resolves.toBe(110)
+      expect(cancel).toHaveBeenCalledTimes(1)
+      expect(notificationCenter.list()).toEqual([
+        expect.objectContaining({ taskId: 'new-choice' }),
+      ])
+    } finally {
+      db.close()
+    }
+  })
+
   it('clears ordinary read and unread notifications while keeping pending choices', async () => {
     const db = new MotrixDatabase(':memory:')
     db.init()

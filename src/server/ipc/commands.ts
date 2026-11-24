@@ -1346,9 +1346,10 @@ export function buildServerCommandHandlers(
 
     [Commands.ClearNotifications]: async () => {
       const pending = getPendingMediaSelection()
-      for (const selection of pending.list())
-        await pending.cancel(selection.taskId)
-      return notificationCenter.clear()
+      const selections = pending.list()
+      const notificationIds = notificationCenter.snapshotIds()
+      for (const selection of selections) await pending.cancel(selection.taskId)
+      return notificationCenter.clearSnapshot(notificationIds)
     },
 
     [Commands.ClearOrdinaryNotifications]: async () =>

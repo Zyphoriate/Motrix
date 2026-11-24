@@ -1,4 +1,5 @@
 import { NotificationCenter } from '@core/notifications/notification-center'
+import type { PendingMediaSelectionService } from '@core/plugin/pending-media-selection-service'
 import { MotrixDatabase } from '@core/session/motrix-database'
 import { Commands } from '@shared/protocol/commands'
 import { Queries } from '@shared/protocol/queries'
@@ -215,6 +216,46 @@ describe('notification center IPC (main)', () => {
       'first',
       'first',
       'second',
+    ])
+  })
+
+  it('clears the full initial snapshot and preserves choices arriving during cancellation', async () => {
+    for (let index = 0; index < 110; index++)
+      notificationCenter.notify({
+        sourceKey: `initial-${index}`,
+        kind: 'task-error',
+        severity: 'error',
+        titleKey: 'title',
+      })
+    let finish!: () => void
+    const waiting = new Promise<void>((resolve) => {
+      finish = resolve
+    })
+    const selections = [{ taskId: 'initial-choice' }]
+    const cancel = vi.fn(async () => waiting)
+    const handlers = buildNotificationHandlers({
+      notificationCenter,
+      getPendingMediaSelection: () => ({
+        list: () =>
+          [...selections] as ReturnType<PendingMediaSelectionService['list']>,
+        cancel,
+      }),
+    })
+    const clearing = handlers[Commands.ClearNotifications]?.()
+    expect(cancel).toHaveBeenCalledWith('initial-choice')
+    selections.push({ taskId: 'new-choice' })
+    notificationCenter.notify({
+      sourceKey: 'new-choice',
+      kind: 'media-selection-required',
+      severity: 'warning',
+      titleKey: 'title',
+      taskId: 'new-choice',
+    })
+    finish()
+    await expect(clearing).resolves.toBe(110)
+    expect(cancel).toHaveBeenCalledTimes(1)
+    expect(notificationCenter.list()).toEqual([
+      expect.objectContaining({ taskId: 'new-choice' }),
     ])
   })
 

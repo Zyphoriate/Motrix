@@ -1304,6 +1304,23 @@ export class MotrixDatabase {
     return this.stmtDeleteNotification.run(id).changes > 0
   }
 
+  snapshotNotificationIds(hiddenKinds: readonly string[] = []): string[] {
+    const rows = this.db
+      .prepare(
+        'SELECT id FROM notifications WHERE kind NOT IN (SELECT value FROM json_each(?))'
+      )
+      .all(JSON.stringify(hiddenKinds)) as { id: string }[]
+    return rows.map((row) => row.id)
+  }
+
+  clearNotificationSnapshot(ids: readonly string[]): number {
+    return this.db
+      .prepare(
+        'DELETE FROM notifications WHERE id IN (SELECT value FROM json_each(?))'
+      )
+      .run(JSON.stringify(ids)).changes
+  }
+
   /** Display table only — the ledger (`notification_occurrences`) is
    *  untouched by delete/clear/prune, per the delivery-idempotency spec. */
   clearNotifications(hiddenKinds: readonly string[] = []): number {

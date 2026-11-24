@@ -133,6 +133,16 @@ export class NotificationCenter {
     return count
   }
 
+  snapshotIds(): string[] {
+    return this.deps.store.snapshotNotificationIds(this.deps.getHiddenKinds?.())
+  }
+
+  clearSnapshot(ids: readonly string[]): number {
+    const count = this.deps.store.clearNotificationSnapshot(ids)
+    if (count > 0) this.deps.emit(Events.NotificationsChanged)
+    return count
+  }
+
   clear(): number {
     const count = this.deps.store.clearNotifications(
       this.deps.getHiddenKinds?.()

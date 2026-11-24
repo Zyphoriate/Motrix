@@ -216,9 +216,6 @@ export function NotificationsPage() {
   )
   const [missingTaskIds, setMissingTaskIds] = useState(new Set<string>())
   const hasItems = items.length > 0
-  const hasOrdinaryItems = items.some(
-    (item) => item.kind !== NotificationKinds.MediaSelectionRequired
-  )
   const pending = useRef(false)
   const [busy, setBusy] = useState(false)
   const [failureKey, setFailureKey] = useState<string | null>(null)
@@ -301,7 +298,7 @@ export function NotificationsPage() {
           <ToolbarGroup>
             <ToolbarButton
               label={t('notification.center.clearOrdinary')}
-              disabled={!hasOrdinaryItems || busy}
+              disabled={busy}
               onClick={() =>
                 void runAction(async () => {
                   await transport.invoke(Commands.ClearOrdinaryNotifications)

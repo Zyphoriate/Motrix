@@ -619,13 +619,25 @@ describe('<NotificationsPage>', () => {
     )
   })
 
-  it('disables ordinary clearing when only media selection notifications remain', async () => {
-    mockList([notification({ kind: 'media-selection-required' })])
+  it('allows clearing older ordinary notifications hidden behind a page of pending choices', async () => {
+    mockList(
+      Array.from({ length: 100 }, (_, index) =>
+        notification({
+          id: `pending-${index}`,
+          kind: 'media-selection-required',
+        })
+      )
+    )
     renderPage()
-    await screen.findByText('file.zip failed')
-    expect(
+    await screen.findAllByText('file.zip failed')
+    fireEvent.click(
       screen.getByRole('button', { name: /clear ordinary notifications/i })
-    ).toBeDisabled()
+    )
+    await waitFor(() =>
+      expect(transport.invoke).toHaveBeenCalledWith(
+        Commands.ClearOrdinaryNotifications
+      )
+    )
   })
 
   it('clears history through one backend command and refreshes the pending queue', async () => {
