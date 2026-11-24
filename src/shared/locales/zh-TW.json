@@ -1,5 +1,13 @@
 {
   "mediaSelection": {
+    "pending": {
+      "notificationTitle": "請選擇影片：{{title}}",
+      "notificationBody": "選擇要下載的影片後即可繼續。",
+      "selectVideos": "選擇影片",
+      "actionRequired": "待操作",
+      "resolved": "已處理",
+      "badgeAria": "待選擇影片：{{total}} 項"
+    },
     "title": "選擇影片",
     "selectAll": "全選",
     "selectNone": "取消全選",

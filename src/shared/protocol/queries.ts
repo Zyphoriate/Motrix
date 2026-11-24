@@ -1,4 +1,6 @@
 export const Queries = {
+  ListPendingMediaSelections: 'query:listPendingMediaSelections',
+  GetPendingMediaSelection: 'query:getPendingMediaSelection',
   GetNasSettings: 'query:getNasSettings',
   GetPortableMode: 'query:getPortableMode',
   GetGraphicsRecoveryNotice: 'query:getGraphicsRecoveryNotice',

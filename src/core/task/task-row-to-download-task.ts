@@ -1,5 +1,6 @@
 import type { TaskInstanceRow, TaskRow } from '@core/session/motrix-database'
 import { legacyTaskMetadataSchema } from '@shared/schemas/legacy-import'
+import { getPendingMediaSelectionRequestId } from '@shared/schemas/pending-media-selection'
 import {
   type DownloadTask,
   makeDefaultBtExtension,
@@ -62,7 +63,11 @@ export function taskRowToDownloadTask(
   )
   if (bt && legacy.success) bt.selectedFiles = legacy.data.selectedFiles
 
+  const pendingRequestId = getPendingMediaSelectionRequestId({ instances })
   return restoreMediaProgress({
+    ...(pendingRequestId
+      ? { pendingMediaSelection: { requestId: pendingRequestId } }
+      : {}),
     id: task.motrixId,
     engineTaskId: primary?.gid ?? '',
     name: task.name,

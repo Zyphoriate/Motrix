@@ -1,5 +1,13 @@
 {
   "mediaSelection": {
+    "pending": {
+      "notificationTitle": "Choose videos: {{title}}",
+      "notificationBody": "Choose the videos to continue downloading.",
+      "selectVideos": "Videoları seç",
+      "actionRequired": "Action required",
+      "resolved": "Already handled",
+      "badgeAria": "Pending video selections: {{total}}"
+    },
     "title": "Videoları seç",
     "selectAll": "Tümünü seç",
     "selectNone": "Seçimi temizle",

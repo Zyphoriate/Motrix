@@ -108,6 +108,33 @@ async function previewAndRequest(h: ReturnType<typeof setup>) {
 }
 
 describe('plugin media selections', () => {
+  it('passes a stable per-entry receipt and private cookies only to the resolver', async () => {
+    const h = setup()
+    const request = await previewAndRequest(h)
+    const queueRequestId = 'fa9b3a9b-6b18-4a59-9882-4b53969806f7'
+    await h.service.create(request, {
+      requestId: queueRequestId,
+      cookies: 'private-cookie',
+    })
+    expect(h.invokeCommand).toHaveBeenCalledWith(
+      pluginId,
+      `${pluginId}.resolve`,
+      { url: `${source}?p=1`, quality: '1080p', cookies: 'private-cookie' }
+    )
+    const firstInput = h.createTask.mock.calls[0][0] as unknown as Record<
+      string,
+      unknown
+    >
+    expect(firstInput.requestId).toMatch(/^[a-f0-9-]{36}$/)
+    expect(firstInput).not.toHaveProperty('cookies')
+    const refreshed = await previewAndRequest(h)
+    await h.service.create(refreshed, { requestId: queueRequestId })
+    expect(
+      (h.createTask.mock.calls[2][0] as unknown as Record<string, unknown>)
+        .requestId
+    ).toBe(firstInput.requestId)
+  })
+
   it('only inspects supported pages and creates no tasks before confirmation', async () => {
     const h = setup()
     expect(

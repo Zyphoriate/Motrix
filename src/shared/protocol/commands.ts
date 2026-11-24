@@ -1,4 +1,6 @@
 export const Commands = {
+  ConfirmPendingMediaSelection: 'command:confirmPendingMediaSelection',
+  CancelPendingMediaSelection: 'command:cancelPendingMediaSelection',
   InspectPluginMedia: 'command:inspectPluginMedia',
   CreatePluginMediaTasks: 'command:createPluginMediaTasks',
   SaveNasSettings: 'command:saveNasSettings',

@@ -1,5 +1,13 @@
 {
   "mediaSelection": {
+    "pending": {
+      "notificationTitle": "Choose videos: {{title}}",
+      "notificationBody": "Choose the videos to continue downloading.",
+      "selectVideos": "Alege videoclipuri",
+      "actionRequired": "Action required",
+      "resolved": "Already handled",
+      "badgeAria": "Pending video selections: {{total}}"
+    },
     "title": "Alege videoclipuri",
     "selectAll": "Selectează tot",
     "selectNone": "Deselectează tot",

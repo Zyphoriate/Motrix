@@ -22,6 +22,10 @@ import { makePluginMediaResolver } from '@core/bridge-receiver/plugin-media-reso
 import { EventBus } from '@core/events/event-bus'
 import { FfmpegService } from '@core/ffmpeg/ffmpeg-service'
 import { getLogger } from '@core/logger'
+import { PluginMediaSelectionService } from '@core/plugin/media-selection-service'
+import { PendingMediaSelectionService } from '@core/plugin/pending-media-selection-service'
+import { LibsodiumSecretStore } from '@core/plugin/secret-store-libsodium'
+import { MotrixDatabase } from '@core/session/motrix-database'
 import { pauseTask, removeTask, resumeTask } from '@core/task/actions'
 import { TaskManager } from '@core/task/task-manager'
 import {
@@ -45,6 +49,7 @@ import { bootstrapBridgeForServer, type ServerBridgeRuntime } from './bootstrap'
 import { parseRemoteExtensionConfig } from './remote-extension-config'
 
 describe('Server extension media downloads', () => {
+  let pendingDb: MotrixDatabase | undefined
   let root: string
   let runtime: ServerBridgeRuntime | undefined
   let closeClient: (() => void) | undefined
@@ -57,11 +62,13 @@ describe('Server extension media downloads', () => {
     closeClient = undefined
     await runtime?.shutdown()
     runtime = undefined
+    pendingDb?.close()
+    pendingDb = undefined
     vi.restoreAllMocks()
     await rm(root, { recursive: true, force: true })
   })
 
-  async function setup(resolverResult?: unknown) {
+  async function setup(resolverResult?: unknown, pendingSelection = false) {
     const eventBus = new EventBus()
     const taskManager = new TaskManager()
     const persisted = new Map<string, DownloadTask>()
@@ -155,6 +162,81 @@ describe('Server extension media downloads', () => {
         { activate: vi.fn(), invokeCommand } as never
       )
     }
+    let pending: PendingMediaSelectionService | undefined
+    const dispatchSelected = vi.fn(async () => 'selected-child')
+    if (pendingSelection) {
+      pendingDb = new MotrixDatabase(path.join(root, 'motrix.db'))
+      pendingDb.init()
+      const registry = {
+        entries: () => [
+          {
+            enabled: true,
+            executableDigest: 'fixture-v1',
+            origin: 'builtin',
+            manifest: {
+              id: 'test.bili',
+              categories: ['site-resolver'],
+              hostPermissions: ['*://*.bilibili.com/*'],
+              contributes: {
+                commands: [
+                  { id: 'test.bili.inspectMedia', public: true },
+                  { id: 'test.bili.resolve', public: true },
+                ],
+              },
+            },
+          },
+        ],
+        policySnapshot: () => ({
+          enabled: true,
+          generation: 1,
+          executableDigest: 'fixture-v1',
+        }),
+      }
+      invokeCommand.mockImplementation(async (_id, command) =>
+        command.endsWith('.inspectMedia')
+          ? {
+              schemaVersion: 1,
+              title: 'Multipart fixture',
+              entries: [
+                {
+                  id: 'part-1',
+                  title: 'Part one',
+                  url: 'https://www.bilibili.com/video/BV123?p=1',
+                  partNumber: 1,
+                },
+                {
+                  id: 'part-2',
+                  title: 'Part two',
+                  url: 'https://www.bilibili.com/video/BV123?p=2',
+                  partNumber: 2,
+                },
+              ],
+              qualities: ['1080p'],
+              defaultQuality: '1080p',
+            }
+          : resolverResult
+      )
+      const mediaSelection = new PluginMediaSelectionService({
+        registry: registry as never,
+        host: { activate: vi.fn(), invokeCommand } as never,
+        readPluginConfig: () => ({}),
+        createTask: dispatchSelected,
+      })
+      const secrets = await LibsodiumSecretStore.create({ userDataDir: root })
+      pending = new PendingMediaSelectionService({
+        db: pendingDb,
+        taskManager,
+        mediaSelection,
+        encrypt: (value) => secrets.encrypt(value),
+        decrypt: (value) => secrets.decrypt(value),
+        onChange: publish,
+      })
+      deps.inspectMedia = (url) => mediaSelection.inspect({ url })
+      deps.enqueuePendingMediaSelection = (input) => pending!.enqueue(input)
+      deps.cancelPendingMediaSelection = (id) => pending!.cancel(id)
+      deps.getPendingMediaSelectionChildTaskIds = (id) =>
+        pending!.getChildTaskIds(id)
+    }
     const actionDeps = {
       ...deps,
       eventBus,
@@ -235,10 +317,10 @@ describe('Server extension media downloads', () => {
       hostHeader: 'motrix.example',
     })
     closeClient = () => handshake.wire.ws.terminate()
-    const pending = (await runtime.bridgeQueryHandlers[
+    const pendingPairs = (await runtime.bridgeQueryHandlers[
       BridgeQueries.ListPendingPairRequests
     ]()) as Array<{ code?: string }>
-    const { channel } = await runPake(handshake, pending[0].code!)
+    const { channel } = await runPake(handshake, pendingPairs[0].code!)
     await exchangeCredential(handshake, channel)
     const connection = mdxpOverChannel(handshake.wire, channel)
     closeClient = () => {
@@ -258,6 +340,9 @@ describe('Server extension media downloads', () => {
     const completed = vi.fn()
     connection.onNotification(Notifications.TaskCompleted, completed)
     return {
+      pending,
+      dispatchSelected,
+      saveDir,
       media,
       adapter,
       createTask: deps.createTask,
@@ -316,6 +401,77 @@ describe('Server extension media downloads', () => {
       },
     }
   }
+
+  it('persists multipart choices over authenticated WebSocket and resolves only after confirmation', async () => {
+    const s = await setup(
+      {
+        kind: 'direct',
+        directUrl: 'https://cdn.example/selected.mp4',
+        title: 'Selected part',
+      },
+      true
+    )
+    const params = makeDirectSubmit()
+    if (params.selection.kind !== 'direct')
+      throw new Error('Expected direct fixture')
+    params.source.pageUrl = 'https://www.bilibili.com/video/BV123'
+    params.selection.primary.url = params.source.pageUrl
+    params.selection.primary.cookies = [
+      {
+        name: 'SESSDATA',
+        value: 'browser-secret',
+        domain: '.bilibili.com',
+        path: '/',
+        secure: true,
+        httpOnly: true,
+        sameSite: 'lax',
+      },
+    ]
+    params.idempotencyKey = 'multipart-receipt'
+    const receipt = await s.submitPage(params)
+    expect(await s.submitPage(params)).toEqual(receipt)
+    expect(s.taskManager.getById(receipt.taskId)?.status).toBe(
+      TaskStatus.MetadataReady
+    )
+    expect(pendingDb!.getTask(receipt.taskId)).not.toBeNull()
+    expect(s.pending!.list()).toEqual([
+      expect.objectContaining({ taskId: receipt.taskId, saveDir: s.saveDir }),
+    ])
+    expect(
+      s.invokeCommand.mock.calls.every(([, command]) =>
+        command.endsWith('.inspectMedia')
+      )
+    ).toBe(true)
+    expect(s.createTask).not.toHaveBeenCalled()
+    expect(s.dispatchSelected).not.toHaveBeenCalled()
+    expect(s.segmentFiles.size).toBe(0)
+    const stored = pendingDb!.database
+      .prepare('SELECT payload FROM pending_media_selections')
+      .get() as { payload: string }
+    expect(stored.payload).not.toContain('browser-secret')
+    const [selection] = s.pending!.list()
+    const result = await s.pending!.confirm({
+      requestId: selection.requestId,
+      entryIds: ['part-2'],
+      quality: '1080p',
+    })
+    expect(result).toEqual({
+      created: [{ entryId: 'part-2', taskId: 'selected-child' }],
+      failed: [],
+    })
+    expect(s.invokeCommand).toHaveBeenLastCalledWith(
+      'test.bili',
+      'test.bili.resolve',
+      {
+        url: 'https://www.bilibili.com/video/BV123?p=2',
+        quality: '1080p',
+        cookies: 'SESSDATA=browser-secret',
+      }
+    )
+    expect(s.dispatchSelected).toHaveBeenCalledOnce()
+    expect(s.pending!.list()).toEqual([])
+    expect(s.taskManager.getById(receipt.taskId)).toBeUndefined()
+  })
 
   it.each(['direct', 'mux'] as const)(
     'resolves submitted Bilibili pages over authenticated MDXP to %s resources',

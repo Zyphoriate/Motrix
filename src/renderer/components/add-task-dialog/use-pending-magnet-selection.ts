@@ -1,7 +1,8 @@
 import { toast } from '@renderer/components/ui/toast'
 import { useTaskList } from '@renderer/hooks/use-task-list'
 import { openMagnetFileSelection } from '@renderer/lib/open-magnet-file-selection'
-import { TaskStatus } from '@shared/types/task'
+import { isPendingMediaSelectionTask } from '@shared/schemas/pending-media-selection'
+import { TaskStatus, TaskType } from '@shared/types/task'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useAddTaskDialogStore } from './use-add-task-dialog-store'
@@ -39,6 +40,8 @@ export function usePendingMagnetSelection(
   const taskId = tasks.find(
     (task) =>
       task.status === TaskStatus.MetadataReady &&
+      (task.type === TaskType.Magnet || task.type === TaskType.Bt) &&
+      !isPendingMediaSelectionTask(task) &&
       !handled.has(task.id) &&
       (attempts.current.get(task.id) ?? 0) < 3
   )?.id
@@ -103,7 +106,10 @@ export function usePendingMagnetSelection(
         dialog.revision === revision &&
         latestTasks.current.some(
           (task) =>
-            task.id === taskId && task.status === TaskStatus.MetadataReady
+            task.id === taskId &&
+            task.status === TaskStatus.MetadataReady &&
+            (task.type === TaskType.Magnet || task.type === TaskType.Bt) &&
+            !isPendingMediaSelectionTask(task)
         )
       )
     })

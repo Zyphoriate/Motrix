@@ -1,5 +1,13 @@
 {
   "mediaSelection": {
+    "pending": {
+      "notificationTitle": "Choose videos: {{title}}",
+      "notificationBody": "Choose the videos to continue downloading.",
+      "selectVideos": "동영상 선택",
+      "actionRequired": "Action required",
+      "resolved": "Already handled",
+      "badgeAria": "Pending video selections: {{total}}"
+    },
     "title": "동영상 선택",
     "selectAll": "모두 선택",
     "selectNone": "선택 해제",

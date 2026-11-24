@@ -1,5 +1,13 @@
 {
   "mediaSelection": {
+    "pending": {
+      "notificationTitle": "Choose videos: {{title}}",
+      "notificationBody": "Choose the videos to continue downloading.",
+      "selectVideos": "Videók kiválasztása",
+      "actionRequired": "Action required",
+      "resolved": "Already handled",
+      "badgeAria": "Pending video selections: {{total}}"
+    },
     "title": "Videók kiválasztása",
     "selectAll": "Összes kijelölése",
     "selectNone": "Kijelölés törlése",

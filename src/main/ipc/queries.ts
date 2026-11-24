@@ -10,6 +10,7 @@ import { createGetGeoIPStatusHandler } from '@core/geoip/get-geo-ip-status'
 import type { CapabilityHost } from '@core/plugin/capabilities/interface'
 import { readCommandGraph } from '@core/plugin/commands/command-graph'
 import type { GrantsManager } from '@core/plugin/grants/grants-manager'
+import type { PendingMediaSelectionService } from '@core/plugin/pending-media-selection-service'
 import type { PluginRegistry } from '@core/plugin/plugin-registry'
 import {
   buildContributionIndex,
@@ -54,6 +55,7 @@ import { taskTrackerRequestSchema } from '@shared/schemas/task-tracker'
 import type { GetTransferStatsParams } from '@shared/types/stats'
 import type { GetTaskActivityParams } from '@shared/types/task-activity'
 import { ipcMain, session } from 'electron'
+import { z } from 'zod'
 import { getAppImageNativeHost } from '../bridge/appimage-native-host-electron'
 import type { CliToolService } from '../cli/cli-tool-service'
 import type { AppUpdateService } from '../core/app-update-service'
@@ -71,6 +73,7 @@ const SYSTEM_PROXY_PROBE_PARTITION = 'motrix-system-proxy-probe'
 const SYSTEM_PROXY_PROBE_URL = 'https://example.com'
 
 export interface QueryContext {
+  pendingMediaSelection?: PendingMediaSelectionService
   getResolvedLanguage: () => SupportedLocale
   cliToolService: Pick<CliToolService, 'getStatus'>
   taskManager: TaskManager
@@ -138,6 +141,14 @@ export function buildQueryHandlers(ctx: QueryContext): QueryHandlerMap {
   })
 
   return {
+    [Queries.ListPendingMediaSelections]: async () =>
+      ctx.pendingMediaSelection?.list() ?? [],
+    [Queries.GetPendingMediaSelection]: async (request: unknown) => {
+      const { requestId } = z
+        .object({ requestId: z.string().uuid() })
+        .parse(request)
+      return ctx.pendingMediaSelection?.get(requestId) ?? null
+    },
     [Queries.GetCliToolStatus]: async () => cliToolService.getStatus(),
 
     [Queries.ListTasks]: async () => {

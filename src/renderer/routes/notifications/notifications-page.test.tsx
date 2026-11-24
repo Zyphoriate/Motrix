@@ -1,6 +1,7 @@
 import '@test-utils/dom-animations'
 import '@testing-library/jest-dom/vitest'
 import '@renderer/lib/i18n'
+import { requestPendingMediaSelection } from '@renderer/components/media-selection-pending/store'
 import { __resetTaskListStoreForTests } from '@renderer/hooks/use-task-list'
 import { i18n } from '@renderer/lib/i18n'
 import { transport } from '@renderer/lib/transport'
@@ -13,6 +14,10 @@ import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { NotificationsPage } from './notifications-page'
+
+vi.mock('@renderer/components/media-selection-pending/store', () => ({
+  requestPendingMediaSelection: vi.fn(),
+}))
 
 // Mock transport per pending-approvals-section.test.tsx precedent — the page
 // talks to the core through Commands/Queries/Events, not window.motrix.
@@ -86,6 +91,105 @@ describe('<NotificationsPage>', () => {
     // Restore the default locale so a later test file sharing this i18n
     // singleton doesn't inherit zh-CN from a language-switch test elsewhere.
     await i18n.changeLanguage('en-US')
+  })
+
+  it('restores an already-read pending selection without task navigation', async () => {
+    const requestId = 'e41039c7-34c9-49c6-82e1-057e109fe5f7'
+    const entry = {
+      requestId,
+      taskId: requestId,
+      title: 'Video',
+      createdAt: 1,
+      expiresAt: 9999999999999,
+      saveDir: '/downloads',
+    }
+    mockList([
+      notification({
+        kind: 'media-selection-required',
+        taskId: requestId,
+        readAt: 1,
+        titleKey: 'mediaSelection.pending.notificationTitle',
+        titleParams: { title: 'Video' },
+      }),
+    ])
+    const original = vi.mocked(transport.invoke).getMockImplementation()!
+    vi.mocked(transport.invoke).mockImplementation(async (channel, ...args) => {
+      if (channel === Queries.ListPendingMediaSelections) return [entry]
+      if (channel === Queries.GetPendingMediaSelection) return entry
+      return original(channel, ...args)
+    })
+    renderPage()
+    fireEvent.click(await screen.findByText('Choose videos: Video'))
+    await waitFor(() =>
+      expect(requestPendingMediaSelection).toHaveBeenCalledWith(requestId)
+    )
+    expect(screen.getByText('Action required')).toBeVisible()
+    expect(transport.invoke).not.toHaveBeenCalledWith(
+      Queries.GetTaskDetail,
+      requestId
+    )
+    expect(location).toBe('/notifications')
+  })
+
+  it('marks a settled selection handled after a fresh queue check and never reopens it', async () => {
+    const requestId = 'e41039c7-34c9-49c6-82e1-057e109fe5f7'
+    const entry = {
+      requestId,
+      taskId: requestId,
+      title: 'Video',
+      createdAt: 1,
+      expiresAt: 9999999999999,
+      saveDir: '/downloads',
+    }
+    let list = [entry]
+    mockList([
+      notification({
+        kind: 'media-selection-required',
+        taskId: requestId,
+        titleKey: 'mediaSelection.pending.notificationTitle',
+        titleParams: { title: 'Video' },
+      }),
+    ])
+    const original = vi.mocked(transport.invoke).getMockImplementation()!
+    vi.mocked(transport.invoke).mockImplementation(async (channel, ...args) => {
+      if (channel === Queries.ListPendingMediaSelections) return list
+      if (channel === Queries.GetPendingMediaSelection) {
+        list = []
+        return null
+      }
+      return original(channel, ...args)
+    })
+    renderPage()
+    await screen.findByText('Action required')
+    fireEvent.click(screen.getByText('Choose videos: Video'))
+    expect(await screen.findByText('Already handled')).toBeVisible()
+    expect(requestPendingMediaSelection).not.toHaveBeenCalled()
+  })
+
+  it('keeps the queue recovery action when notification history is empty', async () => {
+    const requestId = 'e41039c7-34c9-49c6-82e1-057e109fe5f7'
+    const entry = {
+      requestId,
+      taskId: requestId,
+      title: 'Video',
+      createdAt: 1,
+      expiresAt: 9999999999999,
+      saveDir: '/downloads',
+    }
+    mockList([])
+    const original = vi.mocked(transport.invoke).getMockImplementation()!
+    vi.mocked(transport.invoke).mockImplementation(async (channel, ...args) => {
+      if (channel === Queries.ListPendingMediaSelections) return [entry]
+      if (channel === Queries.GetPendingMediaSelection) return entry
+      return original(channel, ...args)
+    })
+    renderPage()
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Choose videos' })
+    )
+    await waitFor(() =>
+      expect(requestPendingMediaSelection).toHaveBeenCalledWith(requestId)
+    )
   })
 
   it('renders the Empty state when there are no notifications, without a list role', async () => {

@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { scopedCreateRequestId } from '@core/task/create-request-id'
 import {
   InspectMediaArgsSchema,
   type MediaCollection,
@@ -55,6 +56,9 @@ export interface PluginMediaTaskInput {
   saveDir: string
   connections?: number
   pluginId: string
+  requestId?: string
+  source?: 'user' | 'bridge' | 'plugin'
+  sourceMeta?: import('@shared/types/task').SourceMeta
 }
 interface Options {
   registry: Pick<PluginRegistry, 'entries' | 'policySnapshot'>
@@ -189,7 +193,15 @@ export class PluginMediaSelectionService {
     return null
   }
 
-  async create(raw: unknown): Promise<CreatePluginMediaTasksResult> {
+  async create(
+    raw: unknown,
+    options?: {
+      requestId?: string
+      cookies?: string
+      source?: 'user' | 'bridge' | 'plugin'
+      sourceMeta?: import('@shared/types/task').SourceMeta
+    }
+  ): Promise<CreatePluginMediaTasksResult> {
     const request = CreatePluginMediaTasksRequestSchema.parse(raw)
     const session = this.sessions.get(request.selectionId)
     if (!session || session.preview.expiresAt <= this.now()) {
@@ -209,7 +221,16 @@ export class PluginMediaSelectionService {
     session.pending += 1
     const operation = session.tail
       .catch(() => undefined)
-      .then(() => this.createSelected(session, request))
+      .then(() =>
+        this.createSelected(
+          session,
+          request,
+          options?.requestId,
+          options?.cookies,
+          options?.source,
+          options?.sourceMeta
+        )
+      )
     session.tail = operation
     try {
       return await operation
@@ -220,7 +241,11 @@ export class PluginMediaSelectionService {
 
   private async createSelected(
     session: Session,
-    request: CreatePluginMediaTasksRequest
+    request: CreatePluginMediaTasksRequest,
+    requestId?: string,
+    cookies?: string,
+    source?: 'user' | 'bridge' | 'plugin',
+    sourceMeta?: import('@shared/types/task').SourceMeta
   ): Promise<CreatePluginMediaTasksResult> {
     const result: CreatePluginMediaTasksResult = { created: [], failed: [] }
     const { pluginId } = session.preview
@@ -251,6 +276,7 @@ export class PluginMediaSelectionService {
           {
             url: entry.url,
             quality: request.quality,
+            ...(cookies ? { cookies } : {}),
           }
         )
         const resolution = PluginMediaResolutionSchema.parse(raw)
@@ -264,6 +290,11 @@ export class PluginMediaSelectionService {
           resolution,
           pluginId,
           saveDir: request.saveDir,
+          ...(requestId
+            ? { requestId: scopedCreateRequestId(requestId, entryId) }
+            : {}),
+          ...(source ? { source } : {}),
+          ...(sourceMeta ? { sourceMeta } : {}),
           ...(request.connections ? { connections: request.connections } : {}),
         })
         session.created.set(entryId, taskId)

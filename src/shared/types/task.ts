@@ -74,6 +74,8 @@ export interface TaskInstance {
 }
 
 export interface DownloadTask {
+  /** Durable selection ownership is stored in the primary instance payload. */
+  pendingMediaSelection?: { requestId: string }
   /** Transient storage work; never restored as an engine task after restart. */
   storageOperation?: boolean
   id: string

@@ -11,6 +11,7 @@ import {
   SeedStartIcon,
   StopIcon,
 } from '@renderer/components/icons'
+import { requestPendingMediaSelection } from '@renderer/components/media-selection-pending/store'
 import { MagnetFileSelectionButton } from '@renderer/components/task/magnet-file-selection-button'
 import { Button } from '@renderer/components/ui/button'
 import { toast } from '@renderer/components/ui/toast'
@@ -23,8 +24,12 @@ import {
   hostOpenFileLabelKey,
   hostRevealFolderLabelKey,
 } from '@renderer/platform/nas'
+import {
+  getPendingMediaSelectionRequestId,
+  isPendingMediaSelectionTask,
+} from '@shared/schemas/pending-media-selection'
 import type { DownloadTask } from '@shared/types/task'
-import { TaskStatus } from '@shared/types/task'
+import { TaskStatus, TaskType } from '@shared/types/task'
 import { canOpenTaskFile } from '@shared/types/task-actions'
 import type React from 'react'
 import { useState } from 'react'
@@ -321,9 +326,22 @@ export function TaskInspectorActionBar({
         />
       )}
 
-      {single && single.status === TaskStatus.MetadataReady && (
-        <MagnetFileSelectionButton task={single} />
-      )}
+      {single &&
+        single.status === TaskStatus.MetadataReady &&
+        (isPendingMediaSelectionTask(single) ? (
+          <Button
+            size="xs"
+            variant="outline"
+            onClick={() => {
+              const requestId = getPendingMediaSelectionRequestId(single)
+              if (requestId) requestPendingMediaSelection(requestId)
+            }}
+          >
+            {t('panel.downloads.action.selectFiles')}
+          </Button>
+        ) : single.type === TaskType.Magnet || single.type === TaskType.Bt ? (
+          <MagnetFileSelectionButton task={single} />
+        ) : null)}
 
       {single && hasHostFileActions() && canOpenTaskFile(single) && (
         <OpenTaskFileButton task={single} />

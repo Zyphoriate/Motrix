@@ -1,5 +1,13 @@
 {
   "mediaSelection": {
+    "pending": {
+      "notificationTitle": "Choose videos: {{title}}",
+      "notificationBody": "Choose the videos to continue downloading.",
+      "selectVideos": "Elegir vídeos",
+      "actionRequired": "Action required",
+      "resolved": "Already handled",
+      "badgeAria": "Pending video selections: {{total}}"
+    },
     "title": "Elegir vídeos",
     "selectAll": "Seleccionar todo",
     "selectNone": "Deseleccionar todo",

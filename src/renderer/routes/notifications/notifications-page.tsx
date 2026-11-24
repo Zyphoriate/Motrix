@@ -14,7 +14,9 @@ import {
   NotificationsIcon,
   RemoveIcon,
 } from '@renderer/components/icons'
+import { requestPendingMediaSelection } from '@renderer/components/media-selection-pending/store'
 import { useNotifications } from '@renderer/components/notification-center/use-notifications'
+import { usePendingMediaSelections } from '@renderer/components/notification-center/use-pending-media-selections'
 import {
   Empty,
   EmptyDescription,
@@ -30,7 +32,10 @@ import { transport } from '@renderer/lib/transport'
 import { cn } from '@renderer/lib/utils'
 import { isTaskAvailable, resolveTaskRoute } from '@shared/lib/task-navigation'
 import { Queries } from '@shared/protocol/queries'
-import type { AppNotification } from '@shared/types/notification'
+import {
+  type AppNotification,
+  NotificationKinds,
+} from '@shared/types/notification'
 import type { DownloadTask } from '@shared/types/task'
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -45,6 +50,7 @@ function NotificationRow({
   onDelete,
   busy,
   taskMissing,
+  selectionPending,
 }: {
   item: AppNotification
   now: number
@@ -53,6 +59,7 @@ function NotificationRow({
   onDelete: () => void
   busy: boolean
   taskMissing: boolean
+  selectionPending: boolean
 }) {
   const { t, i18n } = useTranslation()
   const descriptionId = useId()
@@ -67,6 +74,7 @@ function NotificationRow({
     item.bodyKey != null
       ? resolveNotificationText(item.bodyKey, item.bodyParams, t, i18n.exists)
       : null
+  const mediaSelection = item.kind === NotificationKinds.MediaSelectionRequired
   const unread = item.readAt === null
   const canOpen = item.taskId != null && !taskMissing
   const validDate =
@@ -89,9 +97,17 @@ function NotificationRow({
         }
         title={
           canOpen
-            ? t('notification.center.viewTask')
+            ? t(
+                mediaSelection
+                  ? 'mediaSelection.pending.selectVideos'
+                  : 'notification.center.viewTask'
+              )
             : taskMissing
-              ? t('notification.center.taskRemoved')
+              ? t(
+                  mediaSelection
+                    ? 'mediaSelection.pending.resolved'
+                    : 'notification.center.taskRemoved'
+                )
               : unread
                 ? t('notification.center.markRead')
                 : undefined
@@ -104,7 +120,9 @@ function NotificationRow({
           aria-hidden="true"
           className={cn(
             'mt-[7px] size-1.5 rounded-full',
-            unread && 'bg-sky-600 dark:bg-sky-400'
+            selectionPending
+              ? 'bg-amber-400'
+              : unread && 'bg-sky-600 dark:bg-sky-400'
           )}
         />
         <NotificationIcon item={item} />
@@ -117,6 +135,16 @@ function NotificationRow({
           >
             {title}
           </span>
+          {selectionPending && (
+            <span className="flex items-center gap-2 text-xs/5">
+              <span className="rounded bg-amber-400/20 px-1.5 text-amber-700 dark:text-amber-300">
+                {t('mediaSelection.pending.actionRequired')}
+              </span>
+              <span className="font-medium text-amber-700 underline underline-offset-2 dark:text-amber-300">
+                {t('mediaSelection.pending.selectVideos')}
+              </span>
+            </span>
+          )}
           {body && (
             <span
               id={descriptionId}
@@ -139,7 +167,11 @@ function NotificationRow({
               id={statusId}
               className="whitespace-nowrap text-[11px]/5 text-muted-foreground"
             >
-              {t('notification.center.taskRemoved')}
+              {t(
+                mediaSelection
+                  ? 'mediaSelection.pending.resolved'
+                  : 'notification.center.taskRemoved'
+              )}
             </span>
           )}
         </span>
@@ -165,6 +197,12 @@ export function NotificationsPage() {
   const navigate = useNavigate()
   const { items, unreadCount, markRead, markAllRead, remove, clear } =
     useNotifications()
+  const {
+    items: pendingSelections,
+    ready: pendingReady,
+    refresh: refreshPending,
+  } = usePendingMediaSelections()
+  const pendingIds = new Set(pendingSelections.map((item) => item.requestId))
   const now = useMinuteClock()
   const { tasks, status: taskListStatus } = useTaskList()
   const availableTaskIds = useMemo(
@@ -214,6 +252,20 @@ export function NotificationsPage() {
       if (taskId == null) return
       if (item.readAt === null) await markRead(item.id)
       if (!mounted.current) return
+      if (item.kind === NotificationKinds.MediaSelectionRequired) {
+        const selection = await transport.invoke(
+          Queries.GetPendingMediaSelection,
+          { requestId: taskId }
+        )
+        if (!mounted.current) return
+        if (selection == null) {
+          setMissingTaskIds((ids) => new Set(ids).add(taskId))
+          await refreshPending()
+          return
+        }
+        requestPendingMediaSelection(taskId)
+        return
+      }
       const revision = getTaskListSnapshot().revision
       const task = (await transport.invoke(
         Queries.GetTaskDetail,
@@ -279,6 +331,44 @@ export function NotificationsPage() {
             className="flex min-h-full flex-col"
             style={{ minWidth: '100%' }}
           >
+            {pendingSelections.length > 0 && (
+              <section
+                className="mb-3 flex shrink-0 flex-col gap-2 rounded-md border border-amber-400/50 bg-amber-400/10 p-3"
+                aria-label={t('mediaSelection.pending.actionRequired')}
+              >
+                {pendingSelections.map((selection) => (
+                  <div
+                    key={selection.requestId}
+                    className="flex items-center justify-between gap-3"
+                  >
+                    <span className="min-w-0 truncate text-xs">
+                      {selection.title}
+                    </span>
+                    <button
+                      type="button"
+                      className="shrink-0 text-xs font-medium text-amber-700 underline underline-offset-2 dark:text-amber-300"
+                      disabled={busy}
+                      onClick={() =>
+                        void runAction(async () => {
+                          const current = await transport.invoke(
+                            Queries.GetPendingMediaSelection,
+                            { requestId: selection.requestId }
+                          )
+                          if (!mounted.current) return
+                          if (current == null) {
+                            await refreshPending()
+                            return
+                          }
+                          requestPendingMediaSelection(selection.requestId)
+                        })
+                      }
+                    >
+                      {t('mediaSelection.pending.selectVideos')}
+                    </button>
+                  </div>
+                ))}
+              </section>
+            )}
             {hasItems ? (
               <ul aria-label={t('notification.center.title')}>
                 {items.map((item) => (
@@ -287,11 +377,18 @@ export function NotificationsPage() {
                     item={item}
                     now={now}
                     busy={busy}
+                    selectionPending={
+                      item.kind === NotificationKinds.MediaSelectionRequired &&
+                      item.taskId != null &&
+                      pendingIds.has(item.taskId)
+                    }
                     taskMissing={
                       item.taskId != null &&
                       (missingTaskIds.has(item.taskId) ||
-                        (taskListStatus === 'ready' &&
-                          !availableTaskIds.has(item.taskId)))
+                        (item.kind === NotificationKinds.MediaSelectionRequired
+                          ? pendingReady && !pendingIds.has(item.taskId)
+                          : taskListStatus === 'ready' &&
+                            !availableTaskIds.has(item.taskId)))
                     }
                     onRead={() => {
                       if (item.readAt === null)

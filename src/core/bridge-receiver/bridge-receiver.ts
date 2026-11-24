@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import type { BridgeEventBus } from '@core/bridge/bridge-event-bus'
 import { IdempotencyCache } from '@core/bridge/idempotency-cache'
 import type { MdxpSessionContext } from '@core/bridge/mdxp-session-context'
@@ -13,7 +14,8 @@ import {
 } from '@motrix/mdxp'
 import { clientKey } from '@shared/protocol/bridge'
 import { Events } from '@shared/protocol/events'
-import type { DownloadTask } from '@shared/types/task'
+import type { MediaSelectionPreview } from '@shared/schemas/plugin-media-selection'
+import type { DownloadTask, SourceMeta } from '@shared/types/task'
 import type { TaskActivityRecorder } from '@shared/types/task-activity'
 import type { BridgeErrorCode } from './errors'
 import { BridgeReceiverError } from './errors'
@@ -49,6 +51,18 @@ export function serializeCookieHeader(
 }
 
 export interface BridgeReceiverDeps {
+  inspectMedia?: (url: string) => Promise<MediaSelectionPreview | null>
+  enqueuePendingMediaSelection?: (input: {
+    url: string
+    preview: MediaSelectionPreview
+    saveDir: string
+    source: 'bridge'
+    sourceMeta: SourceMeta
+    cookies?: string
+    dedupKey?: string
+  }) => Promise<{ taskId: string }>
+  cancelPendingMediaSelection?: (taskId: string) => Promise<void>
+  getPendingMediaSelectionChildTaskIds?: (taskId: string) => string[]
   /** Shared host runtime; its lifetime is independent of this listener. */
   mediaRuntime?: MediaTaskRuntime
   mediaMetaStore: ConstructorParameters<
@@ -311,7 +325,9 @@ export class BridgeReceiver {
     // Resource headers replace page headers; browser cookies stay API-only.
     if (
       adapted.kind === 'direct' &&
-      (this.deps.resolveMedia || this.deps.resolveToMux)
+      (this.deps.inspectMedia ||
+        this.deps.resolveMedia ||
+        this.deps.resolveToMux)
     ) {
       const rawCookies =
         params.selection.kind === 'direct'
@@ -319,6 +335,32 @@ export class BridgeReceiver {
           : []
       const serialized = serializeCookieHeader(rawCookies)
       const cookieHeader = serialized || undefined
+      const preview = await this.deps.inspectMedia?.(adapted.primaryUrl)
+      if (
+        preview &&
+        (preview.entries.length > 1 || preview.showSinglePartDialog === true) &&
+        this.deps.enqueuePendingMediaSelection
+      ) {
+        const receipt = params.idempotencyKey
+          ? createHash('sha256')
+              .update(
+                JSON.stringify([
+                  adapted.sourceMeta.sessionKey,
+                  params.idempotencyKey,
+                ])
+              )
+              .digest('hex')
+          : undefined
+        return this.deps.enqueuePendingMediaSelection({
+          url: adapted.primaryUrl,
+          preview,
+          saveDir: adapted.saveDir,
+          source: 'bridge',
+          sourceMeta: adapted.sourceMeta,
+          ...(cookieHeader ? { cookies: cookieHeader } : {}),
+          ...(receipt ? { dedupKey: `bridge:${receipt}` } : {}),
+        })
+      }
       const resolved = this.deps.resolveMedia
         ? await this.deps.resolveMedia(adapted.primaryUrl, cookieHeader)
         : null
@@ -480,6 +522,10 @@ export class BridgeReceiver {
    *  which subsystem owns the task, so both the direct pipeline and the
    *  media coordinator are tried defensively; not-found is silently swallowed. */
   async cancel(taskId: string): Promise<void> {
+    await this.deps.cancelPendingMediaSelection?.(taskId)
+    const children =
+      this.deps.getPendingMediaSelectionChildTaskIds?.(taskId) ?? []
+    await Promise.all(children.map((child) => this.cancel(child)))
     await Promise.allSettled([
       this.direct.cancel(taskId),
       this.coordinator?.cancel(taskId),

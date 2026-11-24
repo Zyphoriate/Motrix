@@ -3,32 +3,32 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from '@renderer/components/ui/sidebar'
+import { cn } from '@renderer/lib/utils'
 import { useTranslation } from 'react-i18next'
 import { NavLink } from 'react-router'
 import { useNotifications } from './use-notifications'
+import { usePendingMediaSelections } from './use-pending-media-selections'
 
 const UNREAD_DISPLAY_CAP = 99
 
 /**
- * Sidebar footer nav entry (Task 17R rework, 2026-08-04 — supersedes Task
- * 17's Popover design per the user's mid-Phase-C decision: the notification
- * center is a dedicated page, not a popover). A `NavLink` to `/notifications`,
- * rendered as a sibling `SidebarMenuItem` inside `AppSidebar`'s
- * `<SidebarFooter><SidebarMenu>`, BEFORE the `SidebarSeparator` + Settings
- * entry. `useNotifications({ countOnly: true })` drives the badge here
- * independently of `NotificationsPage`'s own instance — the page only
- * mounts when routed, so the two never double-fetch while the page is
- * off-screen. This item is always mounted (sidebar footer) and only ever
- * reads `unreadCount`, so `countOnly` skips the `ListNotifications` query
- * entirely rather than paying for a 100-row fetch it never renders.
+ * Notification history uses a count-only mirror. The independent pending queue
+ * takes badge priority until its action is resolved, even after history clears.
  */
 export function NotificationsNavItem() {
   const { t } = useTranslation()
   const { unreadCount, badgeStyle } = useNotifications({ countOnly: true })
+  const { items: pendingSelections } = usePendingMediaSelections()
+  const hasPending = pendingSelections.length > 0
+  const displayCount = hasPending ? pendingSelections.length : unreadCount
+  const effectiveStyle = hasPending ? 'count' : badgeStyle
+  const badgeAria = hasPending
+    ? t('mediaSelection.pending.badgeAria', { total: pendingSelections.length })
+    : t('notification.center.unreadBadgeAria', { count: unreadCount })
   const badgeLabel =
-    unreadCount > UNREAD_DISPLAY_CAP
+    displayCount > UNREAD_DISPLAY_CAP
       ? `${UNREAD_DISPLAY_CAP}+`
-      : String(unreadCount)
+      : String(displayCount)
 
   return (
     <SidebarMenuItem>
@@ -42,7 +42,7 @@ export function NotificationsNavItem() {
           >
             <NotificationsIcon />
             <span className="select-none">{t('nav.notifications')}</span>
-            {unreadCount > 0 && badgeStyle === 'dot' && (
+            {displayCount > 0 && effectiveStyle === 'dot' && (
               <span
                 data-testid="notification-badge-dot"
                 role="status"
@@ -50,22 +50,28 @@ export function NotificationsNavItem() {
                 className="ms-auto size-1.5 shrink-0 rounded-full bg-[#007aff] group-data-[collapsible=icon]:absolute group-data-[collapsible=icon]:top-1 group-data-[collapsible=icon]:end-1"
               />
             )}
-            {unreadCount > 0 && badgeStyle === 'count' && (
+            {displayCount > 0 && effectiveStyle === 'count' && (
               <>
                 <span
                   data-testid="notification-badge"
                   role="status"
-                  aria-label={t('notification.center.unreadBadgeAria', {
-                    count: unreadCount,
-                  })}
-                  className="ms-auto flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-[#007aff] px-1 text-[11px] font-semibold leading-none text-white proportional-nums group-data-[collapsible=icon]:hidden"
+                  aria-label={badgeAria}
+                  className={cn(
+                    'ms-auto flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full px-1 text-[11px] font-semibold leading-none proportional-nums group-data-[collapsible=icon]:hidden',
+                    hasPending
+                      ? 'bg-amber-400 text-amber-950'
+                      : 'bg-[#007aff] text-white'
+                  )}
                 >
                   {badgeLabel}
                 </span>
                 <span
                   data-testid="notification-badge-dot"
                   aria-hidden="true"
-                  className="absolute top-1 end-1 hidden size-1.5 rounded-full bg-[#007aff] group-data-[collapsible=icon]:block"
+                  className={cn(
+                    'absolute top-1 end-1 hidden size-1.5 rounded-full group-data-[collapsible=icon]:block',
+                    hasPending ? 'bg-amber-400' : 'bg-[#007aff]'
+                  )}
                 />
               </>
             )}

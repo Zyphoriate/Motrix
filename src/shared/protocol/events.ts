@@ -10,6 +10,7 @@ export interface WindowMaximizedChangedPayload {
 }
 
 export const Events = {
+  PendingMediaSelectionsChanged: 'event:pendingMediaSelectionsChanged',
   RendererIntent: 'event:rendererIntent',
   RendererHealthProbe: 'event:rendererHealthProbe',
   LegacyImportNavigationChanged: 'event:legacyImportNavigationChanged',

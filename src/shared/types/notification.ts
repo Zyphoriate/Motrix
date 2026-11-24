@@ -8,6 +8,7 @@ export const NotificationKinds = {
   EngineCompatibility: 'engine-compatibility',
   EngineRestartRequired: 'engine-restart-required',
   DnsFallback: 'dns-fallback',
+  MediaSelectionRequired: 'media-selection-required',
 } as const
 export type NotificationKind = string
 

@@ -6,6 +6,7 @@ import {
 import { AppError, ErrorCode } from '@shared/errors'
 import { Events } from '@shared/protocol/events'
 import { legacyBtActivationSchema } from '@shared/schemas/legacy-bt-activation'
+import { isPendingMediaSelectionTask } from '@shared/schemas/pending-media-selection'
 import {
   type DownloadTask,
   TaskInstancePhase,
@@ -65,6 +66,12 @@ export interface RemoveTaskDeps extends TaskActionDeps {
    * back to a plain row delete (no engine handle to leak anyway).
    */
   cancelMedia?: (taskId: string) => Promise<void>
+  pendingMediaSelection?: {
+    cancel: (
+      taskId: string,
+      options?: { deleteParent?: boolean }
+    ) => Promise<void>
+  }
 }
 
 /**
@@ -111,7 +118,7 @@ async function removeTaskUnderMutation(
       'Cannot remove task while it is being finalized'
     )
   }
-  if (options.deleteWithFiles) {
+  if (options.deleteWithFiles && !isPendingMediaSelectionTask(task)) {
     await deps.authorizeTaskRemoval?.(task)
     if (deps.fileCleanupForTask)
       deps = { ...deps, fileCleanupService: deps.fileCleanupForTask(task) }
@@ -129,6 +136,18 @@ async function removeTaskUnderMutation(
         publish()
       }
     })
+
+  // A waiting selection owns no engine work or output files. Cancel its durable
+  // queue entry before deleting the parent so restart cannot recover it.
+  if (isPendingMediaSelectionTask(task)) {
+    await deps.pendingMediaSelection?.cancel(taskId, { deleteParent: false })
+    await deleteParentBarrier(() => {
+      deps.db.deleteTask(taskId)
+      deps.taskManager.remove(taskId)
+    })
+    deps.publishTaskUpdate()
+    return
+  }
 
   // Imported paths belong to v1; every removal request is metadata-only.
   if (hasLegacyImport(task)) {

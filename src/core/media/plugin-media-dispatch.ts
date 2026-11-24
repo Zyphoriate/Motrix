@@ -36,6 +36,7 @@ export async function dispatchPluginMediaTask(
   const result = await handleCreateTask(
     {
       type: 'http',
+      requestId: input.requestId,
       uris: [resolution.kind === 'direct' ? resolution.directUrl : entry.url],
       saveDir,
       connections,
@@ -82,7 +83,8 @@ export async function dispatchPluginMediaTask(
                 ),
               })
           : undefined,
-    }
+    },
+    { source: input.source, sourceMeta: input.sourceMeta }
   )
   return result.taskId
 }

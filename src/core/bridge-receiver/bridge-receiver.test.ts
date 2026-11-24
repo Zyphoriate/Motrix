@@ -979,6 +979,90 @@ describe('BridgeReceiver', () => {
       ...(idempotencyKey ? { idempotencyKey } : {}),
     })
 
+    it.each([
+      { count: 2, showSinglePartDialog: false },
+      { count: 1, showSinglePartDialog: true },
+    ])(
+      'queues a required selection without resolving or creating downloads: %j',
+      async ({ count, showSinglePartDialog }) => {
+        const preview = {
+          entries: Array.from({ length: count }, (_, i) => ({
+            id: `part-${i}`,
+          })),
+          showSinglePartDialog,
+        } as never
+        const enqueuePendingMediaSelection = vi.fn(async () => ({
+          taskId: 'waiting-task',
+        }))
+        const resolveMedia = vi.fn(async () => null)
+        const deps = fakeDeps({
+          inspectMedia: vi.fn(async () => preview),
+          enqueuePendingMediaSelection,
+          resolveMedia,
+        })
+        const receiver = new BridgeReceiver(deps as never)
+        const params = submitParams('same-receipt')
+        params.selection.primary.cookies = [
+          {
+            name: 'session',
+            value: 'cookie-value',
+            domain: 'x',
+            path: '/',
+            secure: false,
+            httpOnly: true,
+          },
+        ] as never
+        expect(await receiver.handle(params, extCtx)).toEqual({
+          taskId: 'waiting-task',
+        })
+        expect(await receiver.handle(params, extCtx)).toEqual({
+          taskId: 'waiting-task',
+        })
+        expect(enqueuePendingMediaSelection).toHaveBeenCalledTimes(1)
+        expect(enqueuePendingMediaSelection).toHaveBeenCalledWith(
+          expect.objectContaining({
+            preview,
+            source: 'bridge',
+            cookies: 'session=cookie-value',
+            dedupKey: expect.stringMatching(/^bridge:[a-f0-9]{64}$/),
+            sourceMeta: expect.objectContaining({ extensionId: 'e' }),
+          })
+        )
+        expect(resolveMedia).not.toHaveBeenCalled()
+        expect(deps.createTask).not.toHaveBeenCalled()
+      }
+    )
+
+    it('continues immediate resolution when the single-part dialog is disabled', async () => {
+      const resolveMedia = vi.fn(async () => null)
+      const enqueuePendingMediaSelection = vi.fn()
+      const deps = fakeDeps({
+        inspectMedia: vi.fn(
+          async () =>
+            ({ entries: [{ id: 'one' }], showSinglePartDialog: false }) as never
+        ),
+        resolveMedia,
+        enqueuePendingMediaSelection,
+      })
+      await new BridgeReceiver(deps as never).handle(submitParams(), extCtx)
+      expect(resolveMedia).toHaveBeenCalledTimes(1)
+      expect(deps.createTask).toHaveBeenCalledTimes(1)
+      expect(enqueuePendingMediaSelection).not.toHaveBeenCalled()
+    })
+
+    it('cancels a waiting receipt and removes already-created child downloads', async () => {
+      const cancelPendingMediaSelection = vi.fn(async () => {})
+      const deps = fakeDeps({
+        cancelPendingMediaSelection,
+        getPendingMediaSelectionChildTaskIds: (id) =>
+          id === 'waiting-task' ? ['part-one', 'part-two'] : [],
+      })
+      await new BridgeReceiver(deps as never).cancel('waiting-task')
+      expect(cancelPendingMediaSelection).toHaveBeenCalledWith('waiting-task')
+      expect(deps.removeTask).toHaveBeenCalledWith('part-one')
+      expect(deps.removeTask).toHaveBeenCalledWith('part-two')
+    })
+
     it('collapses a retransmit with the same key onto the pending submit', async () => {
       let resolveCreate!: (v: { gid: string; taskId: string }) => void
       const createTask = vi.fn(

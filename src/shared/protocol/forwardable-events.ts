@@ -2,6 +2,7 @@ import { BridgeEvents } from './bridge'
 import { Events } from './events'
 
 export const ForwardableEvents = [
+  Events.PendingMediaSelectionsChanged,
   Events.TaskUpdated,
   Events.TaskFilesUpdated,
   Events.BtStorageProgress,
