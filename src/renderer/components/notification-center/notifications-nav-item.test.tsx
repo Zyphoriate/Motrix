@@ -90,7 +90,7 @@ describe('<NotificationsNavItem>', () => {
     vi.useRealTimers()
   })
 
-  it('keeps an actionable amber badge after history is read or cleared, even with hidden badges', async () => {
+  it('keeps an amber badge after reading and removes it when notification deletion settles the queue', async () => {
     let pending = [
       {
         requestId: 'e41039c7-34c9-49c6-82e1-057e109fe5f7',

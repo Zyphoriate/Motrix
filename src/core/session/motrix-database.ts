@@ -1258,6 +1258,13 @@ export class MotrixDatabase {
     }
   }
 
+  getNotification(id: string): AppNotification | null {
+    const row = this.db
+      .prepare('SELECT * FROM notifications WHERE id = ?')
+      .get(id) as RawNotificationRow | undefined
+    return row ? mapNotificationRow(row) : null
+  }
+
   /** Display rows, newest first. Malformed `title_params`/`body_params`
    *  JSON on disk reads back as `null` (validate-on-read) rather than
    *  throwing or trusting an unreadable value. */

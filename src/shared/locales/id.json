@@ -3022,6 +3022,7 @@
     "center": {
       "title": "Notifikasi",
       "markAllRead": "Tandai semua sudah dibaca",
+      "clearOrdinary": "Clear ordinary notifications",
       "clearAll": "Hapus",
       "empty": "Tidak ada notifikasi",
       "emptyDesc": "Aktivitas unduhan dan pemberitahuan penting aplikasi akan muncul di sini",

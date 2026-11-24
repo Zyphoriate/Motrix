@@ -29,7 +29,6 @@ export function usePendingMediaSelection() {
   const requested = usePendingMediaSelectionStore((state) => state.requestId)
   const revision = usePendingMediaSelectionStore((state) => state.revision)
   const addTaskOpen = useAddTaskDialogStore((state) => state.open)
-  const [pending, setPending] = useState<string[]>([])
   const [selection, setSelection] = useState<{
     requestId: string
     preview: MediaSelectionPreview
@@ -37,7 +36,6 @@ export function usePendingMediaSelection() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [dialogTick, setDialogTick] = useState(0)
-  const shown = useRef(new Set<string>())
   const latestPending = useRef<string[] | null>(null)
   const current = useRef(selection)
   current.current = selection
@@ -62,7 +60,6 @@ export function usePendingMediaSelection() {
       if (!alive.current || generation !== snapshotGeneration.current) return
       const ids = list.map((item) => item.requestId)
       latestPending.current = ids
-      setPending(ids)
       if (current.current && !ids.includes(current.current.requestId)) dismiss()
       return ids
     } catch {
@@ -127,10 +124,10 @@ export function usePendingMediaSelection() {
   }, [])
 
   useEffect(() => {
-    // A portal mutation can unblock an automatic picker without changing stores.
+    // A portal mutation can unblock an explicit request without changing stores.
     void dialogTick
     if (selection || addTaskOpen || hasOtherDialog()) return
-    const requestId = requested ?? pending.find((id) => !shown.current.has(id))
+    const requestId = requested
     if (!requestId) return
     let active = true
     const generation = ++previewGeneration.current
@@ -148,7 +145,6 @@ export function usePendingMediaSelection() {
           return
         }
         usePendingMediaSelectionStore.getState().clear(revision)
-        shown.current.add(requestId)
         if (response === null) {
           void refresh()
           return
@@ -159,22 +155,13 @@ export function usePendingMediaSelection() {
       })
       .catch(() => {
         if (!active || generation !== previewGeneration.current) return
-        shown.current.add(requestId)
         usePendingMediaSelectionStore.getState().clear(revision)
         void refresh()
       })
     return () => {
       active = false
     }
-  }, [
-    selection,
-    addTaskOpen,
-    requested,
-    revision,
-    pending,
-    dialogTick,
-    refresh,
-  ])
+  }, [selection, addTaskOpen, requested, revision, dialogTick, refresh])
 
   const submit = useCallback(
     async (entryIds: string[], quality: MediaSelectionQuality) => {

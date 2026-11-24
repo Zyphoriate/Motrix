@@ -120,6 +120,19 @@ export class NotificationCenter {
     return changed
   }
 
+  get(id: string): AppNotification | null {
+    return this.deps.store.getNotification(id)
+  }
+
+  clearOrdinary(): number {
+    const count = this.deps.store.clearNotifications([
+      ...(this.deps.getHiddenKinds?.() ?? []),
+      'media-selection-required',
+    ])
+    if (count > 0) this.deps.emit(Events.NotificationsChanged)
+    return count
+  }
+
   clear(): number {
     const count = this.deps.store.clearNotifications(
       this.deps.getHiddenKinds?.()

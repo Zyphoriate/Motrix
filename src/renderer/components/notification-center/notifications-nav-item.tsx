@@ -13,7 +13,7 @@ const UNREAD_DISPLAY_CAP = 99
 
 /**
  * Notification history uses a count-only mirror. The independent pending queue
- * takes badge priority until its action is resolved, even after history clears.
+ * takes badge priority until its action is resolved or its notification is deleted.
  */
 export function NotificationsNavItem() {
   const { t } = useTranslation()

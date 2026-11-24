@@ -3043,6 +3043,7 @@
     "center": {
       "title": "Notifications",
       "markAllRead": "Mark all read",
+      "clearOrdinary": "Clear ordinary notifications",
       "clearAll": "Clear",
       "empty": "No notifications",
       "emptyDesc": "Download activity and important app notices will show up here",

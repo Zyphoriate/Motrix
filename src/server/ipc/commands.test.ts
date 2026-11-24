@@ -14,6 +14,7 @@ import type { ActivationDispatcher } from '@core/plugin/host/activation-dispatch
 import type { PluginHost } from '@core/plugin/host/plugin-host'
 import type { PluginInstaller } from '@core/plugin/install/plugin-installer'
 import { PluginEngineVersionTooOld } from '@core/plugin/manifest/errors'
+import type { PendingMediaSelectionService } from '@core/plugin/pending-media-selection-service'
 import type { PluginRegistry } from '@core/plugin/plugin-registry'
 import type { RegistryClient } from '@core/plugin/registry/registry-client'
 import type { PluginStateStore } from '@core/plugin/state/plugin-state-store'
@@ -2356,6 +2357,7 @@ describe('buildServerCommandHandlers — notification center', () => {
     const handlers = buildServerCommandHandlers({
       ...ctx,
       notificationCenter,
+      motrixDatabase: db,
     } as unknown as ServerCommandContext)
 
     await expect(
@@ -2387,6 +2389,7 @@ describe('buildServerCommandHandlers — notification center', () => {
     const handlers = buildServerCommandHandlers({
       ...ctx,
       notificationCenter,
+      motrixDatabase: db,
     } as unknown as ServerCommandContext)
 
     await expect(
@@ -2402,6 +2405,103 @@ describe('buildServerCommandHandlers — notification center', () => {
     })
     await expect(handlers[Commands.ClearNotifications]?.()).resolves.toBe(1)
     expect(notificationCenter.list()).toHaveLength(0)
+  })
+})
+
+describe('server notification media cancellation', () => {
+  it('awaits real pending service cancellation and retains rows when it fails', async () => {
+    const db = new MotrixDatabase(':memory:')
+    db.init()
+    try {
+      const notificationCenter = new NotificationCenter({
+        store: db,
+        emit: vi.fn(),
+        log: { warn: vi.fn(), error: vi.fn() },
+      })
+      notificationCenter.notify({
+        sourceKey: 'pending',
+        kind: 'media-selection-required',
+        severity: 'warning',
+        titleKey: 'title',
+        taskId: 'pending-task',
+      })
+      const row = notificationCenter.list()[0]
+      const cancel = vi
+        .fn()
+        .mockRejectedValueOnce(new Error('cancel failed'))
+        .mockResolvedValue(undefined)
+      const list = vi
+        .fn()
+        .mockReturnValue([
+          { taskId: 'pending-task' },
+          { taskId: 'unlisted-task' },
+        ])
+      const handlers = buildServerCommandHandlers({
+        ...makeFakeCtx(),
+        notificationCenter,
+        motrixDatabase: db,
+        onMediaSelectionReady: (
+          _media: unknown,
+          pending: PendingMediaSelectionService
+        ) => {
+          vi.spyOn(pending, 'cancel').mockImplementation(cancel)
+          vi.spyOn(pending, 'list').mockImplementation(list)
+        },
+      } as unknown as ServerCommandContext)
+      await expect(
+        handlers[Commands.DeleteNotification]?.(row.id)
+      ).rejects.toThrow('cancel failed')
+      expect(notificationCenter.get(row.id)).not.toBeNull()
+      await expect(handlers[Commands.ClearNotifications]?.()).resolves.toBe(1)
+      expect(cancel.mock.calls.map(([id]) => id)).toEqual([
+        'pending-task',
+        'pending-task',
+        'unlisted-task',
+      ])
+      expect(notificationCenter.list()).toEqual([])
+    } finally {
+      db.close()
+    }
+  })
+
+  it('clears ordinary read and unread notifications while keeping pending choices', async () => {
+    const db = new MotrixDatabase(':memory:')
+    db.init()
+    try {
+      const notificationCenter = new NotificationCenter({
+        store: db,
+        emit: vi.fn(),
+        log: { warn: vi.fn(), error: vi.fn() },
+      })
+      for (const kind of [
+        'task-error',
+        'task-completed',
+        'media-selection-required',
+      ]) {
+        notificationCenter.notify({
+          sourceKey: kind,
+          kind,
+          severity: 'warning',
+          titleKey: 'title',
+        })
+      }
+      notificationCenter.markRead(
+        notificationCenter.list().find((row) => row.kind === 'task-error')!.id
+      )
+      const handlers = buildServerCommandHandlers({
+        ...makeFakeCtx(),
+        notificationCenter,
+        motrixDatabase: db,
+      } as unknown as ServerCommandContext)
+      await expect(
+        handlers[Commands.ClearOrdinaryNotifications]?.()
+      ).resolves.toBe(2)
+      expect(notificationCenter.list()).toEqual([
+        expect.objectContaining({ kind: 'media-selection-required' }),
+      ])
+    } finally {
+      db.close()
+    }
   })
 })
 

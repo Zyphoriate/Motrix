@@ -294,6 +294,7 @@
       "empty": "ไม่มีการแจ้งเตือน",
       "emptyDesc": "กิจกรรมการดาวน์โหลดและประกาศสำคัญของแอปจะแสดงที่นี่",
       "markAllRead": "ทำเครื่องหมายว่าอ่านแล้วทั้งหมด",
+      "clearOrdinary": "Clear ordinary notifications",
       "markRead": "ทำเครื่องหมายว่าอ่านแล้ว",
       "openTaskFailed": "เปิดงานไม่ได้ ลองอีกครั้ง",
       "removeAria": "นำ {{title}} ออก",

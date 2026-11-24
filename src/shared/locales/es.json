@@ -3064,6 +3064,7 @@
     "center": {
       "title": "Notificaciones",
       "markAllRead": "Marcar todas como leídas",
+      "clearOrdinary": "Clear ordinary notifications",
       "clearAll": "Borrar",
       "empty": "No hay notificaciones",
       "emptyDesc": "Aquí aparecerán la actividad de descargas y los avisos importantes de la aplicación",

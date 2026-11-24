@@ -3022,6 +3022,7 @@
     "center": {
       "title": "Thông báo",
       "markAllRead": "Đánh dấu tất cả là đã đọc",
+      "clearOrdinary": "Clear ordinary notifications",
       "clearAll": "Xóa",
       "empty": "Không có thông báo",
       "emptyDesc": "Hoạt động tải xuống và thông báo quan trọng của ứng dụng sẽ xuất hiện ở đây",

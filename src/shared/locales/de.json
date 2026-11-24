@@ -3043,6 +3043,7 @@
     "center": {
       "title": "Benachrichtigungen",
       "markAllRead": "Alle als gelesen markieren",
+      "clearOrdinary": "Clear ordinary notifications",
       "clearAll": "Leeren",
       "empty": "Keine Benachrichtigungen",
       "emptyDesc": "Hier erscheinen Download-Aktivitäten und wichtige Anwendungshinweise",

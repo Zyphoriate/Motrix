@@ -18,6 +18,7 @@ import {
   waitFor,
   within,
 } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { NotificationsPage } from './notifications-page'
@@ -62,6 +63,7 @@ function mockList(
       if (ch === Queries.ListTasks) return tasks
       if (ch === Queries.GetTaskDetail)
         return tasks.find((task) => task.id === id) ?? null
+      if (ch === Queries.ListPendingMediaSelections) return []
       if (ch === Queries.ListNotifications) return items
       if (ch === Queries.GetUnreadNotificationCount) {
         return items.filter((it) => it.readAt === null).length
@@ -372,13 +374,13 @@ describe('<NotificationsPage>', () => {
     expect(location).toBe('/notifications')
   })
 
-  it('disables mark-all-read when every notification is already read', async () => {
+  it('enables clearing ordinary notifications when every notification is already read', async () => {
     mockList([notification({ readAt: Date.now() })])
     renderPage()
     await screen.findByText('file.zip failed')
     expect(
-      screen.getByRole('button', { name: /mark all read/i })
-    ).toBeDisabled()
+      screen.getByRole('button', { name: /clear ordinary notifications/i })
+    ).toBeEnabled()
     expect(screen.getByRole('button', { name: /^clear$/i })).toBeEnabled()
   })
 
@@ -581,21 +583,158 @@ describe('<NotificationsPage>', () => {
     ).toHaveLength(2)
   })
 
-  it('mark-all-read and clear invoke their commands', async () => {
-    mockList([notification({ id: 'n1' })])
+  it('double-check deletes ordinary notifications, including read items, and preserves selections', async () => {
+    const ordinary = notification({ id: 'n1', readAt: 1 })
+    const selection = notification({
+      id: 'n2',
+      kind: 'media-selection-required',
+    })
+    let items = [ordinary, selection]
+    mockList(items)
+    const original = vi.mocked(transport.invoke).getMockImplementation()!
+    vi.mocked(transport.invoke).mockImplementation(async (channel, ...args) => {
+      if (channel === Commands.ClearOrdinaryNotifications) {
+        items = [selection]
+        return
+      }
+      if (channel === Queries.ListNotifications) return items
+      return original(channel, ...args)
+    })
+    renderPage()
+    await screen.findAllByText('file.zip failed')
+    await userEvent.click(
+      screen.getByRole('button', { name: /clear ordinary notifications/i })
+    )
+    await waitFor(() => expect(screen.getAllByRole('listitem')).toHaveLength(1))
+    expect(transport.invoke).toHaveBeenCalledWith(
+      Commands.ClearOrdinaryNotifications
+    )
+    expect(transport.invoke).not.toHaveBeenCalledWith(
+      Commands.MarkNotificationRead,
+      expect.anything()
+    )
+    expect(transport.invoke).not.toHaveBeenCalledWith(
+      Commands.CancelPendingMediaSelection,
+      expect.anything()
+    )
+  })
+
+  it('disables ordinary clearing when only media selection notifications remain', async () => {
+    mockList([notification({ kind: 'media-selection-required' })])
     renderPage()
     await screen.findByText('file.zip failed')
+    expect(
+      screen.getByRole('button', { name: /clear ordinary notifications/i })
+    ).toBeDisabled()
+  })
 
-    fireEvent.click(screen.getByRole('button', { name: /mark all read/i }))
-    await waitFor(() =>
-      expect(transport.invoke).toHaveBeenCalledWith(
-        Commands.MarkAllNotificationsRead
-      )
+  it('clears history through one backend command and refreshes the pending queue', async () => {
+    const requestId = 'e41039c7-34c9-49c6-82e1-057e109fe5f7'
+    let pending = [
+      {
+        requestId,
+        taskId: requestId,
+        title: 'Video',
+        createdAt: 1,
+        expiresAt: 9999999999999,
+        saveDir: '/downloads',
+      },
+    ]
+    let items = [
+      notification(),
+      notification({
+        id: 'media',
+        kind: 'media-selection-required',
+        taskId: requestId,
+      }),
+    ]
+    mockList(items)
+    const original = vi.mocked(transport.invoke).getMockImplementation()!
+    vi.mocked(transport.invoke).mockImplementation(async (channel, ...args) => {
+      if (channel === Commands.ClearNotifications) {
+        items = []
+        pending = []
+        return
+      }
+      if (channel === Queries.ListNotifications) return items
+      if (channel === Queries.ListPendingMediaSelections) return pending
+      return original(channel, ...args)
+    })
+    renderPage()
+    await screen.findByText('Action required')
+    const pendingReads = vi
+      .mocked(transport.invoke)
+      .mock.calls.filter(
+        ([channel]) => channel === Queries.ListPendingMediaSelections
+      ).length
+    await userEvent.click(screen.getByRole('button', { name: 'Clear' }))
+    expect(await screen.findByText('No notifications')).toBeVisible()
+    expect(transport.invoke).toHaveBeenCalledWith(Commands.ClearNotifications)
+    expect(transport.invoke).not.toHaveBeenCalledWith(
+      Commands.CancelPendingMediaSelection,
+      expect.anything()
     )
+    expect(
+      vi
+        .mocked(transport.invoke)
+        .mock.calls.filter(
+          ([channel]) => channel === Queries.ListPendingMediaSelections
+        ).length
+    ).toBeGreaterThan(pendingReads)
+  })
 
-    fireEvent.click(screen.getByRole('button', { name: /^clear$/i }))
-    await waitFor(() =>
-      expect(transport.invoke).toHaveBeenCalledWith(Commands.ClearNotifications)
+  it('refreshes pending selections after deleting a selection notification', async () => {
+    const requestId = 'e41039c7-34c9-49c6-82e1-057e109fe5f7'
+    let pending = [
+      {
+        requestId,
+        taskId: requestId,
+        title: 'Video',
+        createdAt: 1,
+        expiresAt: 9999999999999,
+        saveDir: '/downloads',
+      },
+    ]
+    let items = [
+      notification({ kind: 'media-selection-required', taskId: requestId }),
+    ]
+    mockList(items)
+    const original = vi.mocked(transport.invoke).getMockImplementation()!
+    vi.mocked(transport.invoke).mockImplementation(async (channel, ...args) => {
+      if (channel === Commands.DeleteNotification) {
+        items = []
+        pending = []
+        return
+      }
+      if (channel === Queries.ListNotifications) return items
+      if (channel === Queries.ListPendingMediaSelections) return pending
+      return original(channel, ...args)
+    })
+    renderPage()
+    await screen.findByText('Action required')
+    const pendingReads = vi
+      .mocked(transport.invoke)
+      .mock.calls.filter(
+        ([channel]) => channel === Queries.ListPendingMediaSelections
+      ).length
+    await userEvent.click(
+      screen.getByRole('button', { name: 'Remove file.zip failed' })
+    )
+    expect(await screen.findByText('No notifications')).toBeVisible()
+    expect(transport.invoke).toHaveBeenCalledWith(
+      Commands.DeleteNotification,
+      'n1'
+    )
+    expect(
+      vi
+        .mocked(transport.invoke)
+        .mock.calls.filter(
+          ([channel]) => channel === Queries.ListPendingMediaSelections
+        ).length
+    ).toBeGreaterThan(pendingReads)
+    expect(transport.invoke).not.toHaveBeenCalledWith(
+      Commands.CancelPendingMediaSelection,
+      expect.anything()
     )
   })
 

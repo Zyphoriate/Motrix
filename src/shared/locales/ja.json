@@ -3022,6 +3022,7 @@
     "center": {
       "title": "通知",
       "markAllRead": "すべて既読にする",
+      "clearOrdinary": "Clear ordinary notifications",
       "clearAll": "消去",
       "empty": "通知はありません",
       "emptyDesc": "ダウンロードの状況やアプリからの重要なお知らせがここに表示されます",

@@ -31,6 +31,7 @@ import { formatRelativeTime } from '@renderer/lib/relative-time'
 import { transport } from '@renderer/lib/transport'
 import { cn } from '@renderer/lib/utils'
 import { isTaskAvailable, resolveTaskRoute } from '@shared/lib/task-navigation'
+import { Commands } from '@shared/protocol/commands'
 import { Queries } from '@shared/protocol/queries'
 import {
   type AppNotification,
@@ -195,8 +196,7 @@ function NotificationRow({
 export function NotificationsPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
-  const { items, unreadCount, markRead, markAllRead, remove, clear } =
-    useNotifications()
+  const { items, markRead, remove, clear, refresh } = useNotifications()
   const {
     items: pendingSelections,
     ready: pendingReady,
@@ -216,6 +216,9 @@ export function NotificationsPage() {
   )
   const [missingTaskIds, setMissingTaskIds] = useState(new Set<string>())
   const hasItems = items.length > 0
+  const hasOrdinaryItems = items.some(
+    (item) => item.kind !== NotificationKinds.MediaSelectionRequired
+  )
   const pending = useRef(false)
   const [busy, setBusy] = useState(false)
   const [failureKey, setFailureKey] = useState<string | null>(null)
@@ -297,16 +300,27 @@ export function NotificationsPage() {
         >
           <ToolbarGroup>
             <ToolbarButton
-              label={t('notification.center.markAllRead')}
-              disabled={unreadCount === 0 || busy}
-              onClick={() => void runAction(markAllRead)}
+              label={t('notification.center.clearOrdinary')}
+              disabled={!hasOrdinaryItems || busy}
+              onClick={() =>
+                void runAction(async () => {
+                  await transport.invoke(Commands.ClearOrdinaryNotifications)
+                  await refresh()
+                })
+              }
             >
               <MarkAllReadIcon aria-hidden="true" />
             </ToolbarButton>
             <ToolbarButton
               label={t('notification.center.clearAll')}
-              disabled={!hasItems || busy}
-              onClick={() => void runAction(clear)}
+              disabled={(!hasItems && pendingSelections.length === 0) || busy}
+              onClick={() =>
+                void runAction(async () => {
+                  await clear()
+                  await refreshPending()
+                  await refresh()
+                }, 'notification.center.clearFailed')
+              }
             >
               <RemoveIcon aria-hidden="true" />
             </ToolbarButton>
@@ -357,7 +371,13 @@ export function NotificationsPage() {
                         void runAction(() => markRead(item.id))
                     }}
                     onOpen={() => void openTask(item)}
-                    onDelete={() => void runAction(() => remove(item.id))}
+                    onDelete={() =>
+                      void runAction(async () => {
+                        await remove(item.id)
+                        await refreshPending()
+                        await refresh()
+                      })
+                    }
                   />
                 ))}
               </ul>

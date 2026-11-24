@@ -3138,6 +3138,7 @@ async function initializeMainProcess(): Promise<void> {
   })
   const disposeNotificationIpc = registerNotificationIpc({
     notificationCenter,
+    getPendingMediaSelection: () => pendingMediaSelection,
     trackAsyncWork: (operation) => mainProcessWork.run(operation, false),
   })
 

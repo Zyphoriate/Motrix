@@ -294,6 +294,7 @@
       "empty": "Geen meldingen",
       "emptyDesc": "Downloadactiviteit en belangrijke appmeldingen worden hier weergegeven",
       "markAllRead": "Alles markeren als gelezen",
+      "clearOrdinary": "Clear ordinary notifications",
       "markRead": "Markeren als gelezen",
       "openTaskFailed": "De taak kon niet worden geopend. Probeer het opnieuw.",
       "removeAria": "{{title}} verwijderen",

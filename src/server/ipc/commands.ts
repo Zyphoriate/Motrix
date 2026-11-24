@@ -1334,10 +1334,25 @@ export function buildServerCommandHandlers(
     [Commands.MarkAllNotificationsRead]: async () =>
       notificationCenter.markAllRead(),
 
-    [Commands.DeleteNotification]: async (id: string) =>
-      notificationCenter.delete(id),
+    [Commands.DeleteNotification]: async (id: string) => {
+      const notification = notificationCenter.get(id)
+      if (
+        notification?.kind === 'media-selection-required' &&
+        notification.taskId
+      )
+        await getPendingMediaSelection().cancel(notification.taskId)
+      return notificationCenter.delete(id)
+    },
 
-    [Commands.ClearNotifications]: async () => notificationCenter.clear(),
+    [Commands.ClearNotifications]: async () => {
+      const pending = getPendingMediaSelection()
+      for (const selection of pending.list())
+        await pending.cancel(selection.taskId)
+      return notificationCenter.clear()
+    },
+
+    [Commands.ClearOrdinaryNotifications]: async () =>
+      notificationCenter.clearOrdinary(),
 
     // Electron-scoped commands (window chrome, tray, dialog, deep-links,
     // auto-updater, NAT) are intentionally omitted; the web renderer

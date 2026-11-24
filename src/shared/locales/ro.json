@@ -294,6 +294,7 @@
       "empty": "Nicio notificare",
       "emptyDesc": "Activitatea descărcărilor și mesajele importante ale aplicației vor apărea aici",
       "markAllRead": "Marchează toate ca citite",
+      "clearOrdinary": "Clear ordinary notifications",
       "markRead": "Marchează ca citită",
       "openTaskFailed": "Sarcina nu a putut fi deschisă. Încearcă din nou.",
       "removeAria": "Elimină {{title}}",
