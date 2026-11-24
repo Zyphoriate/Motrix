@@ -2,7 +2,6 @@ import { invalidateTaskList } from '@renderer/hooks/use-task-list'
 import { transport } from '@renderer/lib/transport'
 import { usePlatformServices } from '@renderer/platform/services'
 import { Commands } from '@shared/protocol/commands'
-import { Queries } from '@shared/protocol/queries'
 import type {
   AddTaskFormValues,
   TaskCreateRequest,
@@ -127,13 +126,7 @@ export function useMediaSelection(
         const parsed = MediaSelectionPreviewSchema.safeParse(response)
         if (!parsed.success) throw new Error(t('mediaSelection.inspectFailed'))
         const preview = parsed.data
-        const settings = (await transport.invoke(Queries.GetSettings)) as {
-          app?: { mediaSelectionSkipSingleDialog?: boolean }
-        }
-        if (!activeRef.current || current !== generation.current) return true
-        const showSinglePartDialog =
-          preview.showSinglePartDialog ??
-          settings.app?.mediaSelectionSkipSingleDialog === false
+        const showSinglePartDialog = preview.showSinglePartDialog ?? false
         if (preview.entries.length === 1 && !showSinglePartDialog) {
           await submitSingle(preview, values, preview.defaultQuality, current)
           return true

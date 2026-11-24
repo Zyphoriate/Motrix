@@ -172,13 +172,13 @@ describe('Add Task media selection', () => {
       connections: 4,
     })
   })
-  it.each(['720p', '2160p'] as const)(
+  it.each(['highest', '720p', '2160p'] as const)(
     'uses the saved %s preference for direct single-part downloads',
     async (quality) => {
       const singlePreview: MediaSelectionPreview = {
         ...preview,
         entries: [preview.entries[0]!],
-        qualities: ['2160p', '1440p', '1080p', '720p', '480p'],
+        qualities: ['highest', '2160p', '1440p', '1080p', '720p', '480p'],
         defaultQuality: quality,
         showSinglePartDialog: false,
       }
@@ -189,7 +189,7 @@ describe('Add Task media selection', () => {
             created: [{ entryId: 'one', taskId: 'preferred' }],
             failed: [],
           }
-        return { app: { mediaSelectionSkipSingleDialog: false } }
+        return { app: {} }
       })
       setup()
       await userEvent.click(screen.getByRole('button', { name: 'Download' }))
@@ -215,7 +215,7 @@ describe('Add Task media selection', () => {
           defaultQuality: '720p',
           showSinglePartDialog: true,
         }
-      return { app: { mediaSelectionSkipSingleDialog: true } }
+      return { app: {} }
     })
     setup()
     const dialog = await openSelection()
@@ -229,12 +229,12 @@ describe('Add Task media selection', () => {
     ).toBe(false)
   })
 
-  it.each(['1080p', '720p', '2160p'] as const)(
+  it.each(['highest', '1080p', '720p', '2160p'] as const)(
     'initially selects and submits the provider %s preference in the multipart picker',
     async (quality) => {
       const preferredPreview: MediaSelectionPreview = {
         ...preview,
-        qualities: ['2160p', '1440p', '1080p', '720p', '480p'],
+        qualities: ['highest', '2160p', '1440p', '1080p', '720p', '480p'],
         defaultQuality: quality,
       }
       invoke.mockImplementation(async (channel) => {
@@ -250,7 +250,11 @@ describe('Add Task media selection', () => {
       const dialog = await openSelection()
       expect(
         within(dialog).getByRole('combobox', { name: 'Quality' })
-      ).toHaveTextContent(quality)
+      ).toHaveTextContent(
+        quality === 'highest'
+          ? i18n.t('settings.bittorrent.peers.mediaSelectionHighest')
+          : quality
+      )
       await userEvent.click(
         within(dialog).getByRole('button', { name: 'Download selected' })
       )
@@ -266,9 +270,127 @@ describe('Add Task media selection', () => {
     }
   )
 
+  it('submits manually selected highest directly when offered', async () => {
+    const qualities: MediaSelectionPreview['qualities'] = [
+      'highest',
+      '480p',
+      '1080p',
+      '720p',
+    ]
+    invoke.mockImplementation(async (channel) => {
+      if (channel === Commands.InspectPluginMedia)
+        return { ...preview, qualities, defaultQuality: '720p' }
+      if (channel === Commands.CreatePluginMediaTasks)
+        return {
+          created: [{ entryId: 'one', taskId: 'selected' }],
+          failed: [],
+        }
+      return { app: {} }
+    })
+    setup()
+    const dialog = await openSelection()
+    await userEvent.click(
+      within(dialog).getByRole('combobox', { name: 'Quality' })
+    )
+    const highest = await screen.findAllByRole('option', {
+      name: i18n.t('settings.bittorrent.peers.mediaSelectionHighest'),
+    })
+    expect(highest).toHaveLength(1)
+    await userEvent.click(highest[0]!)
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'Download selected' })
+    )
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith(
+        Commands.CreatePluginMediaTasks,
+        expect.objectContaining({ entryIds: ['two'], quality: 'highest' })
+      )
+    )
+  })
+
+  it('shows and submits only qualities offered by legacy providers', async () => {
+    const legacyPreview: MediaSelectionPreview = {
+      ...preview,
+      qualities: ['1080p', '720p', '480p'],
+      defaultQuality: '1080p',
+    }
+    invoke.mockImplementation(async (channel) => {
+      if (channel === Commands.InspectPluginMedia) return legacyPreview
+      if (channel === Commands.CreatePluginMediaTasks)
+        return { created: [{ entryId: 'one', taskId: 'legacy' }], failed: [] }
+      return { app: {} }
+    })
+    setup()
+    const dialog = await openSelection()
+    expect(
+      within(dialog).getByRole('combobox', { name: 'Quality' })
+    ).toHaveTextContent('1080p')
+    await userEvent.click(
+      within(dialog).getByRole('combobox', { name: 'Quality' })
+    )
+    expect(
+      screen.queryByRole('option', {
+        name: i18n.t('settings.bittorrent.peers.mediaSelectionHighest'),
+      })
+    ).not.toBeInTheDocument()
+    await userEvent.click(await screen.findByRole('option', { name: '720p' }))
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'Download selected' })
+    )
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith(
+        Commands.CreatePluginMediaTasks,
+        expect.objectContaining({ entryIds: ['two'], quality: '720p' })
+      )
+    )
+  })
+
+  it('submits an explicit 2160p choice even when the provider defaults to highest', async () => {
+    invoke.mockImplementation(async (channel) => {
+      if (channel === Commands.InspectPluginMedia)
+        return {
+          ...preview,
+          qualities: ['highest', '2160p', '1440p', '1080p', '720p', '480p'],
+          defaultQuality: 'highest',
+        }
+      if (channel === Commands.CreatePluginMediaTasks)
+        return { created: [{ entryId: 'one', taskId: 'explicit' }], failed: [] }
+      return { app: {} }
+    })
+    setup()
+    const dialog = await openSelection()
+    await userEvent.click(
+      within(dialog).getByRole('combobox', { name: 'Quality' })
+    )
+    await userEvent.click(await screen.findByRole('option', { name: '2160p' }))
+    await userEvent.click(
+      within(dialog).getByRole('button', { name: 'Download selected' })
+    )
+    await waitFor(() =>
+      expect(invoke).toHaveBeenCalledWith(
+        Commands.CreatePluginMediaTasks,
+        expect.objectContaining({ entryIds: ['two'], quality: '2160p' })
+      )
+    )
+  })
+
   it('keeps the selected highest quality translated in the Chinese trigger', async () => {
     await i18n.changeLanguage('zh-CN')
     try {
+      invoke.mockImplementation(async (channel) => {
+        if (channel === Commands.InspectPluginMedia)
+          return {
+            ...preview,
+            qualities: ['highest', '1080p', '720p', '480p'],
+            defaultQuality: '1080p',
+          }
+        if (channel === Commands.CreatePluginMediaTasks)
+          return {
+            created: [{ entryId: 'one', taskId: 'highest' }],
+            failed: [],
+          }
+        return { app: {} }
+      })
       setup()
       await userEvent.click(screen.getByRole('button', { name: '下载' }))
       const dialog = await screen.findByRole('dialog', {

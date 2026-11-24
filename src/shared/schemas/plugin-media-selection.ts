@@ -1,16 +1,11 @@
 import {
   InspectMediaArgsSchema,
   MediaCollectionSchema,
+  MediaQualitySchema as MediaSelectionQualitySchema,
 } from '@motrix/plugin-manifest-schema'
 import { z } from 'zod'
 
-export const MediaSelectionQualitySchema = z.enum([
-  '2160p',
-  '1440p',
-  '1080p',
-  '720p',
-  '480p',
-])
+export { MediaSelectionQualitySchema }
 export type MediaSelectionQuality = z.infer<typeof MediaSelectionQualitySchema>
 
 export const InspectPluginMediaRequestSchema = InspectMediaArgsSchema

@@ -121,6 +121,9 @@ export class PluginMediaSelectionService {
       )
       if (result === null) continue
       const collection = MediaCollectionSchema.parse(result)
+      if (!collection.qualities.includes(collection.defaultQuality)) {
+        throw new Error('Media provider default quality was not offered')
+      }
       // A provider may redirect b23.tv to its declared Bilibili host, but may
       // not use this receipt to submit arbitrary third-party page URLs.
       for (const part of collection.entries) {

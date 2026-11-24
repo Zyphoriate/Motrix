@@ -29,15 +29,7 @@ interface MediaEntryRow extends BaseFileRow {
   partNumber?: number
 }
 
-const QUALITY_OPTIONS = [
-  'highest',
-  '2160p',
-  '1440p',
-  '1080p',
-  '720p',
-  '480p',
-] as const
-type MediaSelectionChoice = (typeof QUALITY_OPTIONS)[number]
+type MediaSelectionChoice = MediaSelectionQuality
 
 export function MediaSelectionDialog({
   preview,
@@ -99,9 +91,8 @@ export function MediaSelectionDialog({
             value={quality}
             onValueChange={(value) => {
               if (
-                value === 'highest' ||
-                (value !== null &&
-                  (preview.qualities as readonly string[]).includes(value))
+                value !== null &&
+                (preview.qualities as readonly string[]).includes(value)
               )
                 setQuality(value as MediaSelectionChoice)
             }}
@@ -115,12 +106,11 @@ export function MediaSelectionDialog({
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="highest">
-                {t('settings.bittorrent.peers.mediaSelectionHighest')}
-              </SelectItem>
               {preview.qualities.map((value) => (
                 <SelectItem key={value} value={value}>
-                  {value}
+                  {value === 'highest'
+                    ? t('settings.bittorrent.peers.mediaSelectionHighest')
+                    : value}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -181,14 +171,7 @@ export function MediaSelectionDialog({
           <Button
             size="sm"
             disabled={busy || entryIds.length === 0}
-            onClick={() =>
-              onSubmit(
-                entryIds,
-                quality === 'highest'
-                  ? highestQuality(preview.qualities)
-                  : quality
-              )
-            }
+            onClick={() => onSubmit(entryIds, quality)}
           >
             {t('mediaSelection.download')}
           </Button>
@@ -196,18 +179,6 @@ export function MediaSelectionDialog({
       </DialogContent>
     </Dialog>
   )
-}
-
-function highestQuality(
-  qualities: readonly MediaSelectionQuality[]
-): MediaSelectionQuality {
-  return (
-    [...qualities].sort((a, b) => qualityRank(b) - qualityRank(a))[0] ?? '480p'
-  )
-}
-
-function qualityRank(quality: MediaSelectionQuality): number {
-  return Number.parseInt(quality, 10)
 }
 
 function formatDuration(seconds: number): string {
