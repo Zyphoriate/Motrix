@@ -3167,6 +3167,96 @@ describe('handleCreateTask reserved-GID ownership', () => {
 })
 
 describe('handleCreateTask mux pre-resolve seam', () => {
+  it('dispatches a resolved direct URL and title instead of the submitted page', async () => {
+    const deps = makeDeps()
+    const resolveMedia = vi.fn().mockResolvedValue({
+      kind: 'direct',
+      directUrl: 'https://cdn.example/preferred.mp4',
+      title: 'Plugin preferred quality',
+      headers: {
+        Referer: 'https://www.bilibili.com/',
+        Cookie: 'secret',
+        Authorization: 'secret',
+      },
+    })
+    await handleCreateTask(
+      {
+        type: 'http',
+        uris: ['https://www.bilibili.com/video/BV123'],
+        saveDir: '/d',
+        headers: [{ name: 'Authorization', value: 'page-secret' }],
+      },
+      { ...deps, resolveMedia }
+    )
+    expect(deps.addUriWithCookies).toHaveBeenCalledWith(
+      ['https://cdn.example/preferred.mp4'],
+      [],
+      expect.objectContaining({
+        out: 'Plugin preferred quality.mp4.motrix',
+        header: expect.arrayContaining(['Referer: https://www.bilibili.com/']),
+      })
+    )
+    expect(lastAddedTask(deps).name).toBe('Plugin preferred quality.mp4')
+  })
+
+  it('dispatches resolved mux with independent stream headers and a real task receipt', async () => {
+    const deps = makeDeps()
+    const resolveMedia = vi.fn().mockResolvedValue({
+      kind: 'mux',
+      video: {
+        url: 'https://cdn.example/v.m4s',
+        headers: { Referer: 'https://video.example/', Cookie: 'secret' },
+      },
+      audio: {
+        url: 'https://cdn.example/a.m4s',
+        headers: { Referer: 'https://audio.example/' },
+      },
+      title: 'Resolved video',
+      container: 'mp4',
+    })
+    const dispatchMux = vi.fn().mockResolvedValue({ taskId: 'real-mux-id' })
+    const result = await handleCreateTask(
+      {
+        type: 'http',
+        uris: ['https://www.bilibili.com/video/BV123'],
+        saveDir: '/d',
+        headers: [],
+      },
+      { ...deps, resolveMedia, dispatchMux }
+    )
+    expect(result.taskId).toBe('real-mux-id')
+    expect(deps.addUri).not.toHaveBeenCalled()
+    expect(dispatchMux).toHaveBeenCalledWith(
+      expect.objectContaining({
+        finalName: 'Resolved video.mp4',
+        videoHeaders: { Referer: 'https://video.example/' },
+        audioHeaders: { Referer: 'https://audio.example/' },
+        sanitizedHeaders: {},
+      })
+    )
+  })
+
+  it('propagates resolution failure before the engine receives a page URL', async () => {
+    const deps = makeDeps()
+    await expect(
+      handleCreateTask(
+        {
+          type: 'http',
+          uris: ['https://www.bilibili.com/video/BV123'],
+          saveDir: '/d',
+          headers: [],
+        },
+        {
+          ...deps,
+          resolveMedia: vi
+            .fn()
+            .mockRejectedValue(new Error('Media resolution failed')),
+        }
+      )
+    ).rejects.toThrow('Media resolution failed')
+    expect(deps.addUri).not.toHaveBeenCalled()
+  })
+
   it('routes http to dispatchMux (not engine) when resolveToMux returns a mux pair', async () => {
     const muxPair = {
       videoUrl: 'https://video.example/v.mp4',

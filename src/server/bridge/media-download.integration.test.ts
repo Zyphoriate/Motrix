@@ -18,6 +18,7 @@ import {
   startPair,
 } from '@core/bridge/__tests__/mbp1-client'
 import { BridgeReceiver } from '@core/bridge-receiver/bridge-receiver'
+import { makePluginMediaResolver } from '@core/bridge-receiver/plugin-media-resolver'
 import { EventBus } from '@core/events/event-bus'
 import { FfmpegService } from '@core/ffmpeg/ffmpeg-service'
 import { getLogger } from '@core/logger'
@@ -60,7 +61,7 @@ describe('Server extension media downloads', () => {
     await rm(root, { recursive: true, force: true })
   })
 
-  async function setup() {
+  async function setup(resolverResult?: unknown) {
     const eventBus = new EventBus()
     const taskManager = new TaskManager()
     const persisted = new Map<string, DownloadTask>()
@@ -132,6 +133,28 @@ describe('Server extension media downloads', () => {
       publishTaskUpdate: publish,
       publishTaskUpdateNow: publish,
     })
+    const invokeCommand = vi.fn().mockResolvedValue(resolverResult)
+    if (resolverResult !== undefined) {
+      deps.resolveMedia = makePluginMediaResolver(
+        {
+          entries: () => [
+            {
+              enabled: true,
+              origin: 'builtin',
+              manifest: {
+                id: 'test.bili',
+                categories: ['site-resolver'],
+                hostPermissions: ['*://*.bilibili.com/*'],
+                contributes: {
+                  commands: [{ id: 'test.bili.resolve', public: true }],
+                },
+              },
+            },
+          ],
+        } as never,
+        { activate: vi.fn(), invokeCommand } as never
+      )
+    }
     const actionDeps = {
       ...deps,
       eventBus,
@@ -237,6 +260,13 @@ describe('Server extension media downloads', () => {
     return {
       media,
       adapter,
+      createTask: deps.createTask,
+      segmentFiles,
+      invokeCommand,
+      submitPage: (params: DownloadSubmitParams) =>
+        connection.sendRequest(Methods.DownloadSubmit, params) as Promise<{
+          taskId: string
+        }>,
       persisted,
       taskManager,
       ffmpeg,
@@ -286,6 +316,90 @@ describe('Server extension media downloads', () => {
       },
     }
   }
+
+  it.each(['direct', 'mux'] as const)(
+    'resolves submitted Bilibili pages over authenticated MDXP to %s resources',
+    async (kind) => {
+      const s = await setup(
+        kind === 'direct'
+          ? {
+              kind,
+              directUrl: 'https://cdn.example/preferred.mp4',
+              title: 'Plugin preferred video',
+              headers: {
+                Referer: 'https://www.bilibili.com/',
+                Cookie: 'never-on-cdn',
+              },
+            }
+          : {
+              kind,
+              video: {
+                url: 'https://cdn.example/v.mp4',
+                headers: { Referer: 'https://www.bilibili.com/' },
+              },
+              audio: { url: 'https://cdn.example/a.m4a' },
+              title: 'Plugin preferred video',
+              container: 'mp4',
+            }
+      )
+      s.setBinary('/fixture/ffmpeg')
+      const params = makeDirectSubmit()
+      if (params.selection.kind !== 'direct')
+        throw new Error('Expected direct fixture')
+      params.source.pageUrl = 'https://www.bilibili.com/video/BV123'
+      params.source.pageTitle = 'Browser page title'
+      params.selection.primary.url = params.source.pageUrl
+      params.selection.primary.cookies = [
+        {
+          name: 'SESSDATA',
+          value: 'session-private',
+          domain: '.bilibili.com',
+          path: '/',
+          secure: true,
+          httpOnly: true,
+          sameSite: 'lax',
+        },
+      ]
+      params.idempotencyKey = 'page-resolution'
+      const result = await s.submitPage(params)
+      expect(result.taskId).toBeTruthy()
+      expect(await s.submitPage(params)).toEqual(result)
+      expect(s.invokeCommand).toHaveBeenCalledExactlyOnceWith(
+        'test.bili',
+        'test.bili.resolve',
+        { url: params.source.pageUrl, cookies: 'SESSDATA=session-private' }
+      )
+      if (kind === 'direct') {
+        expect(s.createTask).toHaveBeenCalledExactlyOnceWith(
+          expect.objectContaining({
+            uris: ['https://cdn.example/preferred.mp4'],
+            filename: 'Plugin preferred video.mp4',
+            headers: [{ name: 'Referer', value: 'https://www.bilibili.com/' }],
+          }),
+          undefined,
+          expect.objectContaining({
+            source: 'bridge',
+            mediaResolved: true,
+            cookies: [],
+            sourceMeta: expect.objectContaining({
+              pageTitle: 'Browser page title',
+              extensionId: 'a'.repeat(32),
+            }),
+          })
+        )
+      } else {
+        const task = s.taskManager.getById(result.taskId)!
+        expect(task.name).toBe('Plugin preferred video.mp4')
+        expect(task.sourceMeta).toMatchObject({
+          pageUrl: params.source.pageUrl,
+          pageTitle: 'Browser page title',
+          extensionId: 'a'.repeat(32),
+        })
+        await vi.waitFor(() => expect(s.segmentFiles.size).toBe(2))
+        expect(s.createTask).not.toHaveBeenCalled()
+      }
+    }
+  )
 
   it.each(['hls', 'dash', 'mux'] as const)(
     'refreshes capabilities and completes %s through the same authenticated connection',

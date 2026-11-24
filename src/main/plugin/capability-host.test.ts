@@ -110,6 +110,26 @@ describe('createElectronCapabilityHost', () => {
     db.close()
   })
 
+  it('reads updated plugin quality settings through the same live config host', async () => {
+    let stored: Record<string, unknown> = { preferredQuality: '1080p' }
+    const host = await createElectronCapabilityHost({
+      appVersion: '2.0.0',
+      hostLanguage: 'en-US',
+      db,
+      userDataDir: tmpdir(),
+      pluginsDir: path.join(tmpdir(), 'plugins'),
+      settingsManager: makeSettingsManager(),
+      configReader: () => stored,
+      secretFieldsFor: () => new Set(),
+      manifestCommandIdsFor: () => new Set(),
+    })
+    const config = host.configFor('community.bilibili-resolver')
+    expect(await config.get('preferredQuality')).toBe('1080p')
+    stored = { preferredQuality: '720p' }
+    expect(await config.get('preferredQuality')).toBe('720p')
+    host.closeLogs?.()
+  })
+
   it('returns a CapabilityHost with http as HttpCapabilityHost', async () => {
     const host = await createElectronCapabilityHost({
       appVersion: '2.0.0',

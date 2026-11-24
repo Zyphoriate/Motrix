@@ -43,6 +43,7 @@ import {
 import type { BridgeReceiverDeps } from '@core/bridge-receiver/bridge-receiver'
 import { BridgeReceiver } from '@core/bridge-receiver/bridge-receiver'
 import { BridgeStreamSource } from '@core/bridge-receiver/bridge-stream-source'
+import { makePluginMediaResolver } from '@core/bridge-receiver/plugin-media-resolver'
 import { getLogger } from '@core/logger'
 import { urlMatchesHostPermissions } from '@core/plugin/hooks/eligibility'
 import type { PluginHost } from '@core/plugin/host/plugin-host'
@@ -617,7 +618,15 @@ export async function bootstrapBridge(args: {
       pickName: (saveDir, desired) =>
         args.finalNamePicker.pick(saveDir, desired),
       createTask: (req, _deps, options) =>
-        handleCreateTask(req, args.createTaskDeps, options),
+        handleCreateTask(
+          req,
+          {
+            ...args.createTaskDeps,
+            resolveMedia: undefined,
+            resolveToMux: undefined,
+          },
+          options
+        ),
       removeTask: args.removeTask,
       submitMagnetForFileSelection: args.submitMagnetForFileSelection,
       isMagnetFileSelectionEnabled: args.isMagnetFileSelectionEnabled,
@@ -632,7 +641,10 @@ export async function bootstrapBridge(args: {
       activityRecorder: args.activityRecorder,
       segmentAria2: args.segmentAria2,
       tmpRoot: args.tmpRoot,
-      resolveToMux: resolveToMuxFn,
+      resolveMedia: makePluginMediaResolver(
+        args.pluginRegistry,
+        args.pluginHost
+      ),
       persistTask: args.persistTask,
       persistTaskWithOccurrence: args.persistTaskWithOccurrence,
       occurrenceDispatcher: args.occurrenceDispatcher,

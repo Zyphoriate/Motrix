@@ -2,7 +2,7 @@ name: Publish media-selection image to GHCR
 
 on:
   push:
-    branches: [feat/plugin_media_selection_20261123]
+    branches: [main, feat/plugin_media_selection_20261123]
   workflow_dispatch:
 
 permissions:

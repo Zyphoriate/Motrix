@@ -59,6 +59,7 @@ export async function dispatchPluginMediaTask(
       // The selected command already resolved the resource at submit time;
       // the pre-resolve seam must not run a second resolver for this URL.
       orchestrator: undefined,
+      resolveMedia: undefined,
       resolveToMux:
         resolution.kind === 'mux'
           ? async () => ({

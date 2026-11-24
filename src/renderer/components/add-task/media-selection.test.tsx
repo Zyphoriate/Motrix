@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom/vitest'
-import '@renderer/lib/i18n'
+import { i18n } from '@renderer/lib/i18n'
 import {
   type PlatformServices,
   PlatformServicesProvider,
@@ -227,6 +227,66 @@ describe('Add Task media selection', () => {
         ([channel]) => channel === Commands.CreatePluginMediaTasks
       )
     ).toBe(false)
+  })
+
+  it.each(['1080p', '720p', '2160p'] as const)(
+    'initially selects and submits the provider %s preference in the multipart picker',
+    async (quality) => {
+      const preferredPreview: MediaSelectionPreview = {
+        ...preview,
+        qualities: ['2160p', '1440p', '1080p', '720p', '480p'],
+        defaultQuality: quality,
+      }
+      invoke.mockImplementation(async (channel) => {
+        if (channel === Commands.InspectPluginMedia) return preferredPreview
+        if (channel === Commands.CreatePluginMediaTasks)
+          return {
+            created: [{ entryId: 'one', taskId: 'preferred' }],
+            failed: [],
+          }
+        return { app: {} }
+      })
+      setup()
+      const dialog = await openSelection()
+      expect(
+        within(dialog).getByRole('combobox', { name: 'Quality' })
+      ).toHaveTextContent(quality)
+      await userEvent.click(
+        within(dialog).getByRole('button', { name: 'Download selected' })
+      )
+      await waitFor(() =>
+        expect(invoke).toHaveBeenCalledWith(Commands.CreatePluginMediaTasks, {
+          selectionId: preferredPreview.selectionId,
+          entryIds: ['one'],
+          quality,
+          saveDir: '/downloads',
+          connections: 4,
+        })
+      )
+    }
+  )
+
+  it('keeps the selected highest quality translated in the Chinese trigger', async () => {
+    await i18n.changeLanguage('zh-CN')
+    try {
+      setup()
+      await userEvent.click(screen.getByRole('button', { name: '下载' }))
+      const dialog = await screen.findByRole('dialog', {
+        name: i18n.t('mediaSelection.title'),
+      })
+      const trigger = within(dialog).getByRole('combobox', {
+        name: i18n.t('mediaSelection.quality'),
+      })
+      await userEvent.click(trigger)
+      await userEvent.click(await screen.findByRole('option', { name: '最高' }))
+      expect(trigger).toHaveTextContent('最高')
+      expect(trigger).not.toHaveTextContent('highest')
+      expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+    } finally {
+      await act(async () => {
+        await i18n.changeLanguage('en-US')
+      })
+    }
   })
 
   it('always opens the multipart picker using the plugin preference even when the single-part picker is disabled', async () => {

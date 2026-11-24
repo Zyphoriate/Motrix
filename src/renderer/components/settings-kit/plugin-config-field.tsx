@@ -53,7 +53,10 @@ export function PluginConfigField({
           aria-label={node.title ?? name}
           className="w-full max-w-3xs"
         >
-          <SelectValue />
+          <SelectValue>
+            {options.find((option) => option.value === field.value)?.label ??
+              String(field.value ?? '')}
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           <SelectGroup>

@@ -1,6 +1,7 @@
 import path from 'node:path'
 import { stripHopByHopHeaders } from '@core/bridge-receiver/header-replay'
 import { ensureMediaExtension } from '@core/bridge-receiver/pipelines/media-final-name'
+import { resolvedMediaHeaders } from '@core/bridge-receiver/plugin-media-resolver'
 import {
   type AdaptedMux,
   sanitizeFilename,
@@ -19,6 +20,7 @@ import { getLogger } from '@core/logger'
 import type { HookAuditLog } from '@core/plugin/hooks/audit-log'
 import type { HookOrchestrator } from '@core/plugin/hooks/hook-orchestrator'
 import type { StagedMetadataOp } from '@core/plugin/hooks/staged-effects'
+import type { PluginMediaResolution } from '@core/plugin/media-selection-service'
 import type {
   AppliedDownloadProxyPolicyReader,
   AppliedDownloadProxySnapshot,
@@ -196,15 +198,13 @@ export interface CreateTaskDeps {
     taskIds: readonly string[],
     operation: () => Promise<T>
   ) => Promise<T>
-  /**
-   * Optional YouTube/bilibili pre-resolver. When present and the HTTP URL
-   * resolves to a mux pair (video + audio), the download is routed to the
-   * MuxPipeline instead of the normal HTTP engine path. Both deps must be
-   * present for the seam to fire; absence of either → unchanged HTTP path.
-   * Errors are owned by the factory (returns null → HTTP fallback).
-   * The optional cookieHeader arg is for bilibili HD (desktop Add-Task path
-   * passes no cookies — only the extension submit path forwards them).
-   */
+  /** Page resolver shared with extension submits. Null means unclaimed;
+   * claimed-provider failures propagate before any engine dispatch. */
+  resolveMedia?: (
+    url: string,
+    cookies?: string
+  ) => Promise<PluginMediaResolution | null>
+  /** Legacy mux-only pre-resolver retained for existing consumers. */
   resolveToMux?: (
     url: string,
     cookieHeader?: string
@@ -230,6 +230,8 @@ export interface CreateTaskDeps {
 }
 
 export interface CreateTaskOptions {
+  /** Host already resolved this resource; skip page resolution and hooks. */
+  mediaResolved?: true
   /** Internal paired-bridge reservation. Only the host can supply this callback. */
   handoff?: {
     taskId: string
@@ -773,20 +775,52 @@ async function handleCreateTaskUnderAdmission(
       params.filename = `${finalName}${INCOMPLETE_SUFFIX}`
     }
 
-    // 3.4. Mux pre-resolve seam (desktop Add-Task path).
-    // When both resolveToMux and dispatchMux are wired (bridge enabled +
-    // youtube/bilibili URL), call the resolver BEFORE beforeCreate fires.
-    // On a non-null mux pair, build an AdaptedMux reusing the already-computed
-    // taskId/saveDir/finalName, then delegate to MuxPipeline and return — the
-    // entire HTTP/beforeCreate/engine path is bypassed for this URL.
-    // On null (non-resolver URL, bridge disabled, plugin not enabled) → fall
-    // through to the unchanged HTTP path. No try/catch here: the factory owns
-    // error handling (returns null on failure).
-    if (deps.resolveToMux && deps.dispatchMux) {
+    // Resolve claimed page URLs before hooks or engine admission. A resolved
+    // resource replaces page credentials and keeps the plugin's chosen title.
+    let resolvedDirectTitle = false
+    let mediaResolved = opts.mediaResolved === true
+    if (deps.resolveMedia || (deps.resolveToMux && deps.dispatchMux)) {
       const uri = params.uris[0]
       if (uri) {
-        const muxResult = await deps.resolveToMux(uri)
+        const resolved = deps.resolveMedia ? await deps.resolveMedia(uri) : null
+        if (resolved?.kind === 'direct') {
+          mediaResolved = true
+          params.uris = [admitHttpSource(resolved.directUrl)]
+          params.headers = resolvedMediaHeaders(resolved.headers)
+          params.cookies = []
+          const title = sanitizeFilename(resolved.title ?? '').trim()
+          if (title) {
+            const extension =
+              /\.(mp4|mkv|webm|mov|m4v|ts|flv|m4a|aac|mp3|opus)$/i.exec(
+                new URL(resolved.directUrl).pathname
+              )?.[0]
+            await pickHttpName(
+              extension &&
+                !title.toLowerCase().endsWith(extension.toLowerCase())
+                ? `${title}${extension}`
+                : title
+            )
+            resolvedDirectTitle = true
+          }
+        }
+        const muxResult =
+          resolved?.kind === 'mux'
+            ? {
+                videoUrl: resolved.video.url,
+                audioUrl: resolved.audio.url,
+                container: resolved.container,
+                title: resolved.title,
+                headers: {},
+              }
+            : deps.resolveMedia
+              ? null
+              : await deps.resolveToMux?.(uri)
         if (muxResult) {
+          if (!deps.dispatchMux)
+            throw new AppError(
+              ErrorCode.EngineFeatureUnavailable,
+              'settings.integration.media.pipelineUnavailable'
+            )
           const sanitizedHeaders = muxResult.headers
             ? stripHopByHopHeaders(muxResult.headers)
             : {}
@@ -826,10 +860,15 @@ async function handleCreateTaskUnderAdmission(
             videoUrl: admitHttpSource(muxResult.videoUrl),
             audioUrl: admitHttpSource(muxResult.audioUrl),
             sanitizedHeaders,
+            ...(resolved?.kind === 'mux'
+              ? {
+                  videoHeaders: resolvedMediaHeaders(resolved.video.headers),
+                  audioHeaders: resolvedMediaHeaders(resolved.audio.headers),
+                }
+              : {}),
             container: muxResult.container,
-            // Desktop path: no extension session context; sourceMeta is null.
-            // MediaTaskCoordinator accepts SourceMeta (= BridgeSourceMeta | null).
-            sourceMeta: null,
+            // Preserve bridge metadata when the caller has a session identity.
+            sourceMeta: opts.sourceMeta ?? null,
             receipt: opts.receipt,
           }
           const muxDispatchResult = await deps.dispatchMux(adaptedMux)
@@ -858,7 +897,7 @@ async function handleCreateTaskUnderAdmission(
       },
       'beforeCreate hook chain pre-check'
     )
-    if (deps.orchestrator) {
+    if (deps.orchestrator && !mediaResolved) {
       const ctxDto: BeforeCreateHttpContextDTO = {
         schemaVersion: 1,
         invocationId: `before-create:${taskId}`,
@@ -971,7 +1010,7 @@ async function handleCreateTaskUnderAdmission(
     // The hook may replace the source URI. Rebase the non-explicit fallback
     // name onto that final URI before probing, so a failed/empty metadata
     // response cannot resurrect the original request's basename.
-    if (!req.filename?.trim()) {
+    if (!req.filename?.trim() && !resolvedDirectTitle) {
       await pickHttpName(uriBasename(params.uris[0]) ?? 'download')
     }
 
@@ -983,6 +1022,7 @@ async function handleCreateTaskUnderAdmission(
     if (
       !opts.handoff &&
       !req.filename?.trim() &&
+      !resolvedDirectTitle &&
       params.uris.length === 1 &&
       metadataRequestProfile !== null &&
       deps.directResourceValidator?.probe

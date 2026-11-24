@@ -3,6 +3,7 @@ import { IdempotencyCache } from '@core/bridge/idempotency-cache'
 import type { MdxpSessionContext } from '@core/bridge/mdxp-session-context'
 import type { SegmentAria2 } from '@core/download/segment-downloader'
 import { newTaskId } from '@core/lib/ids'
+import type { PluginMediaResolution } from '@core/plugin/media-selection-service'
 import type { MediaTaskCoordinator } from '@core/task/media-task-coordinator'
 import type { TaskManager } from '@core/task/task-manager'
 import {
@@ -23,6 +24,7 @@ import type { HlsDashPipeline } from './pipelines/hls-dash-pipeline'
 import { MagnetPipeline } from './pipelines/magnet-pipeline'
 import { ensureMediaExtension } from './pipelines/media-final-name'
 import type { MuxPipeline } from './pipelines/mux-pipeline'
+import { resolvedMediaHeaders } from './plugin-media-resolver'
 import {
   dispatchTaskUpdates,
   type TaskNotificationSink,
@@ -130,15 +132,14 @@ export interface BridgeReceiverDeps {
     url: string,
     opts: { headers?: Record<string, string> }
   ) => Promise<string>
-  /**
-   * Optional submit-path pre-resolver. When present and the adapted URL is a
-   * YouTube watch page or bilibili page, this is called before kind-routing.
-   * If it returns a mux pair the direct submit is transparently re-routed to
-   * the MuxPipeline. Absent or returning null → direct download proceeds.
-   * All error handling lives in the bootstrap factory (returns null on failure).
-   * An optional cookieHeader (2nd arg) is forwarded when the submit carries
-   * cookies (bilibili HD path). Omitted for YouTube and desktop submits.
-   */
+  /** Resolve page submissions before pipeline routing. Null means unclaimed;
+   * claimed-provider failures propagate rather than downloading page HTML.
+   * Browser cookies are passed only to this resolver, not resolved resources. */
+  resolveMedia?: (
+    url: string,
+    cookieHeader?: string
+  ) => Promise<PluginMediaResolution | null>
+  /** Legacy mux-only injection retained for existing consumers. */
   resolveToMux?: (
     url: string,
     cookieHeader?: string
@@ -306,24 +307,58 @@ export class BridgeReceiver {
     adapted: Awaited<ReturnType<SubmitDownloadAdapter['adapt']>>,
     params: DownloadSubmitParams
   ): Promise<{ taskId: string }> {
-    // Submit-path pre-resolve: if the adapted result is a direct download and
-    // a resolveToMux factory is wired (bootstrap only), call it. On a non-null
-    // mux pair the direct submit is transparently re-routed to MuxPipeline.
-    // resolveToMux owns its own error handling (catches → null), so we never
-    // wrap this in try/catch here — a null means "proceed as direct".
-    //
-    // Cookie handoff (bilibili HD): when the extension submits a direct download
-    // with cookies (e.g. SESSDATA for bilibili), serialize them into a Cookie
-    // header string and pass it as the 2nd arg to resolveToMux. The resolver
-    // attaches the header ONLY to api.bilibili.com calls — never to CDN URLs.
-    if (adapted.kind === 'direct' && this.deps.resolveToMux) {
+    // Resolve once, inside the installation-scoped idempotency operation.
+    // Resource headers replace page headers; browser cookies stay API-only.
+    if (
+      adapted.kind === 'direct' &&
+      (this.deps.resolveMedia || this.deps.resolveToMux)
+    ) {
       const rawCookies =
         params.selection.kind === 'direct'
           ? params.selection.primary.cookies
           : []
       const serialized = serializeCookieHeader(rawCookies)
       const cookieHeader = serialized || undefined
-      const m = await this.deps.resolveToMux(adapted.primaryUrl, cookieHeader)
+      const resolved = this.deps.resolveMedia
+        ? await this.deps.resolveMedia(adapted.primaryUrl, cookieHeader)
+        : null
+      if (resolved?.kind === 'direct') {
+        const title = sanitizeFilename(resolved.title ?? '').trim()
+        const extension =
+          /\.(mp4|mkv|webm|mov|m4v|ts|flv|m4a|aac|mp3|opus)$/i.exec(
+            new URL(resolved.directUrl).pathname
+          )?.[0]
+        const name = title
+          ? extension && !title.toLowerCase().endsWith(extension.toLowerCase())
+            ? `${title}${extension}`
+            : title
+          : ''
+        return this.direct.dispatch({
+          ...adapted,
+          primaryUrl: resolved.directUrl,
+          mediaResolved: true,
+          sanitizedHeaders: resolvedMediaHeaders(resolved.headers),
+          cookies: [],
+          ...(name
+            ? {
+                finalName: await this.deps.pickName(adapted.saveDir, name),
+                discoverFilename: undefined,
+              }
+            : { discoverFilename: true }),
+        })
+      }
+      const m =
+        resolved?.kind === 'mux'
+          ? {
+              videoUrl: resolved.video.url,
+              audioUrl: resolved.audio.url,
+              headers: {},
+              container: resolved.container,
+              title: resolved.title,
+            }
+          : this.deps.resolveMedia
+            ? null
+            : await this.deps.resolveToMux?.(adapted.primaryUrl, cookieHeader)
       if (m) {
         if (!this.mux) {
           throw new BridgeReceiverError(
@@ -348,6 +383,12 @@ export class BridgeReceiver {
           finalName,
           videoUrl: m.videoUrl,
           audioUrl: m.audioUrl,
+          ...(resolved?.kind === 'mux'
+            ? {
+                videoHeaders: resolvedMediaHeaders(resolved.video.headers),
+                audioHeaders: resolvedMediaHeaders(resolved.audio.headers),
+              }
+            : {}),
           sanitizedHeaders: m.headers
             ? stripHopByHopHeaders(m.headers)
             : adapted.sanitizedHeaders,

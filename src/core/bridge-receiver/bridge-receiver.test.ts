@@ -13,6 +13,7 @@ import { makeDownloadTask } from '@test-utils/task'
 import { describe, expect, it, vi } from 'vitest'
 import { BridgeReceiver } from './bridge-receiver'
 import { MediaTaskRuntime } from './media-task-runtime'
+import { makePluginMediaResolver } from './plugin-media-resolver'
 
 /** Minimal fake SegmentAria2 — never actually called in routing tests. */
 const fakeSegmentAria2: SegmentAria2 = {
@@ -551,6 +552,163 @@ describe('BridgeReceiver', () => {
         browser: 'chromium' as const,
       },
     } as never
+
+    function provider(result: unknown) {
+      const invokeCommand = vi.fn().mockResolvedValue(result)
+      const resolveMedia = makePluginMediaResolver(
+        {
+          entries: () => [
+            {
+              enabled: true,
+              origin: 'builtin',
+              manifest: {
+                id: 'test.bili',
+                categories: ['site-resolver'],
+                hostPermissions: ['*://*.bilibili.com/*'],
+                contributes: {
+                  commands: [{ id: 'test.bili.resolve', public: true }],
+                },
+              },
+            },
+          ],
+        } as never,
+        { activate: vi.fn(), invokeCommand } as never
+      )
+      return { resolveMedia, invokeCommand }
+    }
+
+    const biliParams = {
+      ...directParams,
+      idempotencyKey: 'bili-submit',
+      source: {
+        ...directParams.source,
+        pageUrl: 'https://www.bilibili.com/video/BV123',
+        pageTitle: 'Browser title',
+      },
+      selection: {
+        ...directParams.selection,
+        primary: {
+          ...directParams.selection.primary,
+          url: 'https://www.bilibili.com/video/BV123',
+          headers: {
+            Authorization: 'page-secret',
+            Cookie: 'page-cookie',
+            'x-custom': 'page-only',
+          },
+          cookies: [
+            {
+              name: 'SESSDATA',
+              value: 'browser-secret',
+              sameSite: 'lax' as const,
+              domain: '.bilibili.com',
+              path: '/',
+              secure: true,
+              httpOnly: true,
+            },
+          ],
+        },
+      },
+    }
+
+    it('resolves page submits to direct resources with real receipt, metadata and isolated cookies', async () => {
+      const { resolveMedia, invokeCommand } = provider({
+        kind: 'direct',
+        directUrl: 'https://cdn.example/video.mp4',
+        title: 'Preferred quality',
+        headers: {
+          Referer: 'https://www.bilibili.com/',
+          Cookie: 'leak',
+          Authorization: 'leak',
+          Host: 'leak',
+        },
+      })
+      const deps = fakeDeps({ resolveMedia })
+      const receiver = new BridgeReceiver(deps as never)
+      const [first, replay] = await Promise.all([
+        receiver.handle(biliParams, extCtx),
+        receiver.handle(biliParams, extCtx),
+      ])
+      expect(first).toEqual({ taskId: 'task-abc' })
+      expect(replay).toEqual(first)
+      expect(invokeCommand).toHaveBeenCalledExactlyOnceWith(
+        'test.bili',
+        'test.bili.resolve',
+        { url: biliParams.source.pageUrl, cookies: 'SESSDATA=browser-secret' }
+      )
+      expect(deps.createTask).toHaveBeenCalledTimes(1)
+      expect(deps.createTask).toHaveBeenCalledWith(
+        expect.objectContaining({
+          uris: ['https://cdn.example/video.mp4'],
+          filename: 'Preferred quality.mp4',
+          headers: [{ name: 'Referer', value: 'https://www.bilibili.com/' }],
+        }),
+        undefined,
+        expect.objectContaining({
+          source: 'bridge',
+          cookies: [],
+          sourceMeta: expect.objectContaining({
+            extensionId: 'e',
+            browser: 'chromium',
+            pageUrl: biliParams.source.pageUrl,
+            pageTitle: 'Browser title',
+            qualityLabel: '1080p',
+          }),
+        })
+      )
+    })
+
+    it('keeps mux stream headers separate and drops all browser credentials', async () => {
+      const { resolveMedia } = provider({
+        kind: 'mux',
+        video: {
+          url: 'https://video.example/v.m4s',
+          headers: { Referer: 'https://video.example/', Cookie: 'secret' },
+        },
+        audio: {
+          url: 'https://audio.example/a.m4s',
+          headers: {
+            Referer: 'https://audio.example/',
+            Authorization: 'secret',
+          },
+        },
+        title: 'Mux title',
+        container: 'mp4',
+      })
+      const deps = fakeDeps({
+        resolveMedia,
+        ffmpegBinaryPath: '/usr/bin/ffmpeg',
+      })
+      const receiver = new BridgeReceiver(deps as never)
+      const dispatch = vi
+        .spyOn(receiver.muxPipeline!, 'dispatch')
+        .mockResolvedValue({ taskId: 'real-mux-task' })
+      expect(await receiver.handle(biliParams, extCtx)).toEqual({
+        taskId: 'real-mux-task',
+      })
+      expect(dispatch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          finalName: 'Mux title.mp4',
+          videoHeaders: { Referer: 'https://video.example/' },
+          audioHeaders: { Referer: 'https://audio.example/' },
+          sanitizedHeaders: {},
+          sourceMeta: expect.objectContaining({
+            extensionId: 'e',
+            pageTitle: 'Browser title',
+          }),
+        })
+      )
+      expect(deps.createTask).not.toHaveBeenCalled()
+    })
+
+    it('surfaces claimed-provider failure without dispatching the page HTML or leaking credentials', async () => {
+      const { resolveMedia } = provider(null)
+      const deps = fakeDeps({ resolveMedia })
+      const receiver = new BridgeReceiver(deps as never)
+      await expect(receiver.handle(biliParams, extCtx)).rejects.toMatchObject({
+        message: 'Media resolution failed; no download was created',
+      })
+      expect(deps.createTask).not.toHaveBeenCalled()
+    })
 
     it('resolveToMux returning a mux pair routes direct submit to MuxPipeline (not DirectPipeline)', async () => {
       // Set up resolveToMux to return a mux pair

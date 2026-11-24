@@ -108,7 +108,11 @@ export function MediaSelectionDialog({
             disabled={busy}
           >
             <SelectTrigger size="sm" aria-labelledby="media-selection-quality">
-              <SelectValue />
+              <SelectValue>
+                {quality === 'highest'
+                  ? t('settings.bittorrent.peers.mediaSelectionHighest')
+                  : quality}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="highest">
