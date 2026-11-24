@@ -10,7 +10,14 @@ import { Events } from '@shared/protocol/events'
 import { Queries } from '@shared/protocol/queries'
 import type { AppNotification } from '@shared/types/notification'
 import { TaskStatus } from '@shared/types/task'
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import { MemoryRouter, useLocation } from 'react-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { NotificationsPage } from './notifications-page'
@@ -123,7 +130,13 @@ describe('<NotificationsPage>', () => {
     await waitFor(() =>
       expect(requestPendingMediaSelection).toHaveBeenCalledWith(requestId)
     )
-    expect(screen.getByText('Action required')).toBeVisible()
+    const row = screen.getByRole('listitem')
+    expect(within(row).getByText('Action required')).toBeVisible()
+    expect(within(row).getByText('Choose videos')).toBeVisible()
+    expect(row.querySelector('.rounded-full')).toHaveClass('bg-amber-400')
+    expect(
+      screen.queryByRole('region', { name: 'Action required' })
+    ).not.toBeInTheDocument()
     expect(transport.invoke).not.toHaveBeenCalledWith(
       Queries.GetTaskDetail,
       requestId
@@ -166,7 +179,7 @@ describe('<NotificationsPage>', () => {
     expect(requestPendingMediaSelection).not.toHaveBeenCalled()
   })
 
-  it('keeps the queue recovery action when notification history is empty', async () => {
+  it('shows only the empty history state when pending selections have no notification', async () => {
     const requestId = 'e41039c7-34c9-49c6-82e1-057e109fe5f7'
     const entry = {
       requestId,
@@ -184,12 +197,19 @@ describe('<NotificationsPage>', () => {
       return original(channel, ...args)
     })
     renderPage()
-    fireEvent.click(
-      await screen.findByRole('button', { name: 'Choose videos' })
-    )
+    expect(await screen.findByText('No notifications')).toBeVisible()
     await waitFor(() =>
-      expect(requestPendingMediaSelection).toHaveBeenCalledWith(requestId)
+      expect(transport.invoke).toHaveBeenCalledWith(
+        Queries.ListPendingMediaSelections
+      )
     )
+    expect(
+      screen.queryByRole('region', { name: 'Action required' })
+    ).not.toBeInTheDocument()
+    expect(
+      screen.queryByRole('button', { name: 'Choose videos' })
+    ).not.toBeInTheDocument()
+    expect(requestPendingMediaSelection).not.toHaveBeenCalled()
   })
 
   it('renders the Empty state when there are no notifications, without a list role', async () => {
@@ -287,6 +307,11 @@ describe('<NotificationsPage>', () => {
     ])
     renderPage()
     await screen.findByText('file.zip finished downloading')
+    const row = screen.getByRole('listitem')
+    expect(row.querySelector('.rounded-full')).toHaveClass('bg-emerald-600')
+    expect(
+      row.querySelector('[data-icon="status-complete"]')?.parentElement
+    ).toHaveClass('text-emerald-600')
     expect(screen.queryByText('View task')).not.toBeInTheDocument()
     fireEvent.click(
       await screen.findByRole('button', {
@@ -299,6 +324,16 @@ describe('<NotificationsPage>', () => {
       Commands.MarkNotificationRead,
       'n1'
     )
+  })
+
+  it('renders an informational notification with a green info icon', async () => {
+    mockList([notification({ severity: 'info', taskId: null })])
+    renderPage()
+    await screen.findByText('file.zip failed')
+    expect(
+      screen.getByRole('listitem').querySelector('[data-icon="info"]')
+        ?.parentElement
+    ).toHaveClass('text-emerald-600', 'dark:text-emerald-400')
   })
 
   it('does not navigate when the notification has no taskId', async () => {

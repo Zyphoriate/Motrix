@@ -11,7 +11,7 @@ import {
 } from '@shared/types/notification'
 
 const severityIcons = {
-  info: { icon: InfoIcon, className: 'text-muted-foreground' },
+  info: { icon: InfoIcon, className: 'text-emerald-600 dark:text-emerald-400' },
   warning: {
     icon: WarningIcon,
     className: 'text-[#8b784d] dark:text-[#baa574]',
@@ -32,7 +32,7 @@ export function NotificationIcon({ item }: { item: AppNotification }) {
       aria-hidden="true"
       className={cn(
         'flex h-5 w-4 shrink-0 items-center justify-center',
-        complete ? 'text-muted-foreground' : severity.className
+        complete ? severityIcons.info.className : severity.className
       )}
     >
       <Icon className="size-4" strokeWidth={1.5} />

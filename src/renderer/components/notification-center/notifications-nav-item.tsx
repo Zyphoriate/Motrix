@@ -47,7 +47,7 @@ export function NotificationsNavItem() {
                 data-testid="notification-badge-dot"
                 role="status"
                 aria-label={t('notification.center.unreadDotAria')}
-                className="ms-auto size-1.5 shrink-0 rounded-full bg-[#007aff] group-data-[collapsible=icon]:absolute group-data-[collapsible=icon]:top-1 group-data-[collapsible=icon]:end-1"
+                className="ms-auto size-1.5 shrink-0 rounded-full bg-emerald-600 group-data-[collapsible=icon]:absolute group-data-[collapsible=icon]:top-1 group-data-[collapsible=icon]:end-1"
               />
             )}
             {displayCount > 0 && effectiveStyle === 'count' && (
@@ -60,7 +60,7 @@ export function NotificationsNavItem() {
                     'ms-auto flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full px-1 text-[11px] font-semibold leading-none proportional-nums group-data-[collapsible=icon]:hidden',
                     hasPending
                       ? 'bg-amber-400 text-amber-950'
-                      : 'bg-[#007aff] text-white'
+                      : 'bg-emerald-600 text-white'
                   )}
                 >
                   {badgeLabel}
@@ -70,7 +70,7 @@ export function NotificationsNavItem() {
                   aria-hidden="true"
                   className={cn(
                     'absolute top-1 end-1 hidden size-1.5 rounded-full group-data-[collapsible=icon]:block',
-                    hasPending ? 'bg-amber-400' : 'bg-[#007aff]'
+                    hasPending ? 'bg-amber-400' : 'bg-emerald-600'
                   )}
                 />
               </>

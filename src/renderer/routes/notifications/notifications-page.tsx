@@ -122,7 +122,7 @@ function NotificationRow({
             'mt-[7px] size-1.5 rounded-full',
             selectionPending
               ? 'bg-amber-400'
-              : unread && 'bg-sky-600 dark:bg-sky-400'
+              : unread && 'bg-emerald-600 dark:bg-emerald-400'
           )}
         />
         <NotificationIcon item={item} />
@@ -331,44 +331,6 @@ export function NotificationsPage() {
             className="flex min-h-full flex-col"
             style={{ minWidth: '100%' }}
           >
-            {pendingSelections.length > 0 && (
-              <section
-                className="mb-3 flex shrink-0 flex-col gap-2 rounded-md border border-amber-400/50 bg-amber-400/10 p-3"
-                aria-label={t('mediaSelection.pending.actionRequired')}
-              >
-                {pendingSelections.map((selection) => (
-                  <div
-                    key={selection.requestId}
-                    className="flex items-center justify-between gap-3"
-                  >
-                    <span className="min-w-0 truncate text-xs">
-                      {selection.title}
-                    </span>
-                    <button
-                      type="button"
-                      className="shrink-0 text-xs font-medium text-amber-700 underline underline-offset-2 dark:text-amber-300"
-                      disabled={busy}
-                      onClick={() =>
-                        void runAction(async () => {
-                          const current = await transport.invoke(
-                            Queries.GetPendingMediaSelection,
-                            { requestId: selection.requestId }
-                          )
-                          if (!mounted.current) return
-                          if (current == null) {
-                            await refreshPending()
-                            return
-                          }
-                          requestPendingMediaSelection(selection.requestId)
-                        })
-                      }
-                    >
-                      {t('mediaSelection.pending.selectVideos')}
-                    </button>
-                  </div>
-                ))}
-              </section>
-            )}
             {hasItems ? (
               <ul aria-label={t('notification.center.title')}>
                 {items.map((item) => (

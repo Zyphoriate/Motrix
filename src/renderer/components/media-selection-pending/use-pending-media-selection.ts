@@ -18,7 +18,9 @@ import { usePendingMediaSelectionStore } from './store'
 function hasOtherDialog() {
   return (
     useAddTaskDialogStore.getState().open ||
-    document.querySelector('[role="dialog"], [role="alertdialog"]') !== null
+    document.querySelector(
+      '[role="dialog"]:not([data-inspector-drawer="true"]), [role="alertdialog"]'
+    ) !== null
   )
 }
 

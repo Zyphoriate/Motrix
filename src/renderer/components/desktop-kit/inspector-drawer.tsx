@@ -143,6 +143,7 @@ export function InspectorDrawer({
               )
             }}
             aria-label={title}
+            data-inspector-drawer="true"
             className="downloads-inspector-popup pointer-events-auto w-full shadow-[0_-3px_12px_rgba(15,23,42,0.08)]"
             style={{
               height: maximum,
