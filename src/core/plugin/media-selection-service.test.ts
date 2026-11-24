@@ -189,6 +189,76 @@ describe('plugin media selections', () => {
     })
   })
 
+  it.each(['highest', '2160p', '1440p', '1080p', '720p', '480p'])(
+    'preserves the offered %s quality through provider resolution',
+    async (quality) => {
+      const h = setup()
+      const qualities = ['highest', '2160p', '1440p', '1080p', '720p', '480p']
+      h.invokeCommand.mockResolvedValueOnce({
+        ...collection,
+        qualities,
+        defaultQuality: 'highest',
+      })
+      const preview = await h.service.inspect({ url: source })
+      expect(preview).toMatchObject({ qualities, defaultQuality: 'highest' })
+      const result = await h.service.create({
+        selectionId: preview!.selectionId,
+        entryIds: ['cid-1'],
+        quality,
+        saveDir: '/downloads',
+      })
+      expect(result.failed).toEqual([])
+      expect(h.invokeCommand).toHaveBeenLastCalledWith(
+        pluginId,
+        `${pluginId}.resolve`,
+        { url: `${source}?p=1`, quality }
+      )
+    }
+  )
+
+  it.each(['2160p', '1440p', '1080p', '720p', '480p'])(
+    'keeps legacy providers accepting their offered %s quality',
+    async (quality) => {
+      const h = setup()
+      h.invokeCommand.mockResolvedValueOnce({
+        ...collection,
+        qualities: ['2160p', '1440p', '1080p', '720p', '480p'],
+      })
+      const request = await previewAndRequest(h)
+      expect(await h.service.create({ ...request, quality })).toMatchObject({
+        failed: [],
+      })
+      expect(h.invokeCommand).toHaveBeenLastCalledWith(
+        pluginId,
+        `${pluginId}.resolve`,
+        { url: `${source}?p=2`, quality }
+      )
+    }
+  )
+
+  it.each(['highest', '2160p', '1440p'])(
+    'rejects an unoffered %s quality before resolving',
+    async (quality) => {
+      const h = setup()
+      const request = await previewAndRequest(h)
+      await expect(h.service.create({ ...request, quality })).rejects.toThrow(
+        'not offered'
+      )
+      expect(h.invokeCommand).toHaveBeenCalledTimes(1)
+      expect(h.createTask).not.toHaveBeenCalled()
+    }
+  )
+
+  it('rejects defaults that are not offered by the provider', async () => {
+    const h = setup()
+    h.invokeCommand.mockResolvedValueOnce({
+      ...collection,
+      defaultQuality: 'highest',
+    })
+    await expect(h.service.inspect({ url: source })).rejects.toThrow()
+    expect(h.createTask).not.toHaveBeenCalled()
+  })
+
   it('resolves only selected parts at submit time with the selected quality', async () => {
     const h = setup()
     const request = await previewAndRequest(h)
@@ -255,6 +325,32 @@ describe('plugin media selections', () => {
       if (field === 'executableDigest') h.policy.executableDigest = 'changed'
       const result = await h.service.create(request)
       expect(result.failed).toHaveLength(2)
+      expect(h.createTask).not.toHaveBeenCalled()
+    }
+  )
+
+  it.each(['enabled', 'generation', 'executableDigest'] as const)(
+    'does not resolve highest after the provider policy changes: %s',
+    async (field) => {
+      const h = setup()
+      h.invokeCommand.mockResolvedValueOnce({
+        ...collection,
+        qualities: ['highest', ...collection.qualities],
+        defaultQuality: 'highest',
+      })
+      const preview = await h.service.inspect({ url: source })
+      if (field === 'enabled') h.policy.enabled = false
+      if (field === 'generation') h.policy.generation += 1
+      if (field === 'executableDigest') h.policy.executableDigest = 'changed'
+      const result = await h.service.create({
+        selectionId: preview!.selectionId,
+        entryIds: ['cid-1'],
+        quality: 'highest',
+        saveDir: '/downloads',
+      })
+      expect(result.created).toEqual([])
+      expect(result.failed).toHaveLength(1)
+      expect(h.invokeCommand).toHaveBeenCalledTimes(1)
       expect(h.createTask).not.toHaveBeenCalled()
     }
   )
