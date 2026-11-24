@@ -1,5 +1,6 @@
 import type { SelectionStore } from '@renderer/components/desktop-kit/selection/types'
 import { MoreIcon } from '@renderer/components/icons'
+import { requestPendingMediaSelection } from '@renderer/components/media-selection-pending/store'
 import {
   ContextMenu,
   ContextMenuContent,
@@ -37,8 +38,9 @@ import { CommandIds } from '@shared/commands-catalog'
 import { formatNativePath } from '@shared/lib/path-display'
 import { Commands } from '@shared/protocol/commands'
 import type { BtStorageRequest } from '@shared/schemas/bt-storage'
+import { getPendingMediaSelectionRequestId } from '@shared/schemas/pending-media-selection'
 import type { DownloadTask } from '@shared/types/task'
-import { TaskStatus } from '@shared/types/task'
+import { TaskStatus, TaskType } from '@shared/types/task'
 import {
   type BulkTaskCommandResult,
   canManageBtStorage,
@@ -141,6 +143,11 @@ export function TaskActionsMenu({
   const actions = useTaskActions(selected)
   const single = selected.length === 1 ? selected[0] : null
   const canChooseFiles = single && canSelectTaskFiles(single)
+  const canOpenPendingSelection =
+    single?.status === TaskStatus.MetadataReady &&
+    (Boolean(getPendingMediaSelectionRequestId(single)) ||
+      single.type === TaskType.Magnet ||
+      single.type === TaskType.Bt)
   const hasTransferActions =
     actions.pausing ||
     actions.pauseCount +
@@ -150,7 +157,7 @@ export function TaskActionsMenu({
       actions.redownloadCount +
       actions.stopSeedingCount >
       0 ||
-    single?.status === TaskStatus.MetadataReady ||
+    canOpenPendingSelection ||
     canChooseFiles ||
     (single && canManageBtStorage(single)) ||
     actions.moveCount > 0
@@ -379,14 +386,19 @@ export function TaskActionsMenu({
                 {t(`task.storage.${mode}`)}
               </DropdownMenuItem>
             ))}
-          {single?.status === TaskStatus.MetadataReady && (
+          {single && canOpenPendingSelection && (
             <DropdownMenuItem
               disabled={pending}
               onClick={() =>
-                void runAction(
-                  () => openMagnetFileSelection(single.id),
-                  t('panel.downloads.action.selectFilesFailed')
-                )
+                void runAction(async () => {
+                  const requestId = getPendingMediaSelectionRequestId(single)
+                  if (requestId) requestPendingMediaSelection(requestId)
+                  else if (
+                    single.type === TaskType.Magnet ||
+                    single.type === TaskType.Bt
+                  )
+                    await openMagnetFileSelection(single.id)
+                }, t('panel.downloads.action.selectFilesFailed'))
               }
             >
               {t('panel.downloads.action.selectFiles')}

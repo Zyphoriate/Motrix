@@ -111,6 +111,42 @@ afterEach(async () => {
 })
 
 describe('MagnetSelectionTimeout', () => {
+  it.each([false, true])(
+    'never auto-downloads an HTTP waiting parent (marker=%s)',
+    async (marked) => {
+      const f = fixture()
+      f.tasks = [
+        makeDownloadTask({
+          type: TaskType.Http,
+          status: TaskStatus.MetadataReady,
+          pendingMediaSelection: marked
+            ? { requestId: '6a894e0f-eac2-41e2-9911-dadf4603fb73' }
+            : undefined,
+        }),
+      ]
+      f.service.start()
+      await vi.advanceTimersByTimeAsync(120_000)
+      expect(f.getSelection).not.toHaveBeenCalled()
+      expect(f.createTask).not.toHaveBeenCalled()
+      expect(f.notify).not.toHaveBeenCalled()
+    }
+  )
+
+  it('skips a pending media marker even on a stale magnet snapshot', async () => {
+    const f = fixture()
+    f.tasks = [
+      {
+        ...f.tasks[0],
+        pendingMediaSelection: {
+          requestId: '6a894e0f-eac2-41e2-9911-dadf4603fb73',
+        },
+      },
+    ]
+    f.service.start()
+    await vi.advanceTimersByTimeAsync(120_000)
+    expect(f.getSelection).not.toHaveBeenCalled()
+  })
+
   it('starts all files once at the deadline without a renderer', async () => {
     const f = fixture()
     f.service.start()

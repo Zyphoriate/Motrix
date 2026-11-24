@@ -17,6 +17,7 @@ describe('mapStatusToPhase', () => {
   it.each([
     [TaskStatus.Queued, 'queued'],
     [TaskStatus.FetchingMetadata, 'queued'],
+    [TaskStatus.MetadataReady, 'queued'],
     [TaskStatus.Downloading, 'downloading'],
     [TaskStatus.Paused, 'downloading'],
     [TaskStatus.Finalizing, 'finalizing'],
@@ -29,6 +30,19 @@ describe('mapStatusToPhase', () => {
 })
 
 describe('taskToProgressParams', () => {
+  it('publishes waiting selection as queued progress', () => {
+    expect(
+      taskToProgressParams(
+        makeDownloadTask({
+          status: TaskStatus.MetadataReady,
+          pendingMediaSelection: {
+            requestId: '6a894e0f-eac2-41e2-9911-dadf4603fb73',
+          },
+        })
+      ).phase
+    ).toBe('queued')
+  })
+
   it('maps fields and coalesces unknown total/eta to null', () => {
     const params = taskToProgressParams(
       makeDownloadTask({

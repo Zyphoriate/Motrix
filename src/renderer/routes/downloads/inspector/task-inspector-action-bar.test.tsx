@@ -1,3 +1,4 @@
+import { usePendingMediaSelectionStore } from '@renderer/components/media-selection-pending/store'
 import { RemoveTasksDialogHost } from '@renderer/routes/downloads/inspector/remove-tasks-dialog-host'
 import { useRemoveTasksStore } from '@renderer/routes/downloads/inspector/remove-tasks-store'
 import type { DownloadTask } from '@shared/types/task'
@@ -358,6 +359,29 @@ describe('TaskInspectorActionBar', () => {
     expect(screen.getByText('Copy URL')).toBeDefined()
   })
 
+  it('opens media selection from a waiting HTTP parent without querying magnet metadata', () => {
+    const requestId = '6a894e0f-eac2-41e2-9911-dadf4603fb73'
+    usePendingMediaSelectionStore.setState({ requestId: null })
+    vi.mocked(transport.invoke).mockClear()
+    render(
+      <TaskInspectorActionBar
+        selected={[
+          makeTask({
+            type: TaskType.Http,
+            status: TaskStatus.MetadataReady,
+            pendingMediaSelection: { requestId },
+          }),
+        ]}
+        onClose={vi.fn()}
+      />
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Select files' }))
+    expect(usePendingMediaSelectionStore.getState().requestId).toBe(requestId)
+    expect(transport.invoke).not.toHaveBeenCalledWith(
+      Commands.ReopenMagnetFileSelection,
+      expect.anything()
+    )
+  })
   it('MetadataReady magnet single: shows Select files and reopens the dialog on click', () => {
     vi.mocked(transport.invoke).mockClear()
     render(

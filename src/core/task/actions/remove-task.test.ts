@@ -107,6 +107,93 @@ function mediaTaskWithMetadata() {
 }
 
 describe('removeTask', () => {
+  it.each([false, true])(
+    'removes waiting media parents only through the deletion barrier (files=%s)',
+    async (deleteWithFiles) => {
+      const task = makeDownloadTask({
+        type: TaskType.Http,
+        status: TaskStatus.MetadataReady,
+        engineTaskId: '',
+        diskPath: '/downloads',
+        saveDir: '/downloads',
+        pendingMediaSelection: {
+          requestId: '6a894e0f-eac2-41e2-9911-dadf4603fb73',
+        },
+      })
+      const order: string[] = []
+      const cancel = vi.fn(async () => {
+        order.push('cancel')
+      })
+      const deps = makeDeps({
+        pendingMediaSelection: { cancel },
+        cancelMedia: vi.fn(),
+        authorizeTaskRemoval: vi.fn(),
+        deleteParentTasks: vi.fn(async (_ids, publish) => {
+          order.push('barrier')
+          await publish()
+        }),
+      })
+      vi.mocked(deps.taskManager.getById).mockReturnValue(task)
+      await removeTask(task.id, { deleteWithFiles }, deps)
+      expect(order).toEqual(['cancel', 'barrier'])
+      expect(cancel).toHaveBeenCalledWith(task.id, { deleteParent: false })
+      expect(deps.db.deleteTask).toHaveBeenCalledWith(task.id)
+      expect(deps.taskManager.remove).toHaveBeenCalledWith(task.id)
+      expect(deps.authorizeTaskRemoval).not.toHaveBeenCalled()
+      expect(deps.adapter.forceRemoveTask).not.toHaveBeenCalled()
+      expect(deps.adapter.removeDownloadResult).not.toHaveBeenCalled()
+      expect(deps.cancelMedia).not.toHaveBeenCalled()
+      expect(deps.magnetTracker.cancel).not.toHaveBeenCalled()
+      expect(deps.fileCleanupService.cleanup).not.toHaveBeenCalled()
+      expect(deps.torrentMetaStore.remove).not.toHaveBeenCalled()
+      expect(deps.eventBus.emit).not.toHaveBeenCalledWith(
+        Events.ToastShow,
+        expect.anything()
+      )
+      expect(deps.eventBus.emit).toHaveBeenCalledWith(Events.TaskUpdated, [])
+    }
+  )
+
+  it('recognizes a persisted instance payload marker before media cleanup', async () => {
+    const task = mediaTaskWithMetadata()
+    task.status = TaskStatus.MetadataReady
+    task.instances[0].payload.pendingMediaSelection =
+      '6a894e0f-eac2-41e2-9911-dadf4603fb73'
+    const cancel = vi.fn(async () => {})
+    const deps = makeDeps({
+      pendingMediaSelection: { cancel },
+      cancelMedia: vi.fn(),
+    })
+    vi.mocked(deps.taskManager.getById).mockReturnValue(task)
+    await removeTask(task.id, { deleteWithFiles: true }, deps)
+    expect(cancel).toHaveBeenCalledWith(task.id, { deleteParent: false })
+    expect(deps.cancelMedia).not.toHaveBeenCalled()
+    expect(deps.fileCleanupService.cleanup).not.toHaveBeenCalled()
+    expect(deps.db.deleteTask).toHaveBeenCalledWith(task.id)
+  })
+
+  it('keeps the parent when durable waiting cancellation fails', async () => {
+    const task = makeDownloadTask({
+      status: TaskStatus.MetadataReady,
+      pendingMediaSelection: {
+        requestId: '6a894e0f-eac2-41e2-9911-dadf4603fb73',
+      },
+    })
+    const deps = makeDeps({
+      pendingMediaSelection: {
+        cancel: vi.fn(async () => {
+          throw new Error('queue unavailable')
+        }),
+      },
+    })
+    vi.mocked(deps.taskManager.getById).mockReturnValue(task)
+    await expect(
+      removeTask(task.id, { deleteWithFiles: false }, deps)
+    ).rejects.toThrow('queue unavailable')
+    expect(deps.db.deleteTask).not.toHaveBeenCalled()
+    expect(deps.taskManager.remove).not.toHaveBeenCalled()
+  })
+
   it('denies file removal before changing engine or durable task state', async () => {
     const task = makeDownloadTask({ status: TaskStatus.Paused })
     const deps = makeDeps({

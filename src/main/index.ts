@@ -64,7 +64,9 @@ import {
   parsePluginIdleDisposeMs,
 } from '@core/plugin/host/plugin-host'
 import { PluginInstaller } from '@core/plugin/install/plugin-installer'
+import type { PluginMediaSelectionService } from '@core/plugin/media-selection-service'
 import { PluginHttpClient } from '@core/plugin/network/plugin-http-client'
+import type { PendingMediaSelectionService } from '@core/plugin/pending-media-selection-service'
 import { PluginRegistry } from '@core/plugin/plugin-registry'
 import { RegistryClient } from '@core/plugin/registry/registry-client'
 import type { PluginHookRuntime } from '@core/plugin/runtime/plugin-hook-runtime'
@@ -2809,6 +2811,8 @@ async function initializeMainProcess(): Promise<void> {
     segmentAria2: segmentAria2Client,
     tmpRoot: mediaTmpDir,
   })
+  let pendingMediaSelection!: PendingMediaSelectionService
+  let pluginMediaSelection: PluginMediaSelectionService
   const createBridgeRuntime = async () => {
     const bridgeReAddDeps = {
       taskManager,
@@ -2884,6 +2888,7 @@ async function initializeMainProcess(): Promise<void> {
     // from the extension download/cancel closure below (which is always
     // deleteWithFiles:false). Shares the full RemoveTaskDeps bundle.
     const removeTaskDeps = {
+      pendingMediaSelection,
       taskManager,
       adapter,
       log,
@@ -2956,6 +2961,13 @@ async function initializeMainProcess(): Promise<void> {
       getSettings: () => settingsManager.getApp(),
     })
     return bootstrapBridge({
+      inspectMedia: (url) => pluginMediaSelection.inspect({ url }),
+      enqueuePendingMediaSelection: (input) =>
+        pendingMediaSelection.enqueue(input),
+      cancelPendingMediaSelection: (taskId) =>
+        pendingMediaSelection.cancel(taskId),
+      getPendingMediaSelectionChildTaskIds: (taskId) =>
+        pendingMediaSelection.getChildTaskIds(taskId),
       mediaRuntime: mediaTaskRuntime ?? undefined,
       ...(handoffJournal
         ? {
@@ -3139,6 +3151,10 @@ async function initializeMainProcess(): Promise<void> {
   })
 
   const disposeCommandHandlers = registerCommandHandlers({
+    onMediaSelectionReady: (mediaSelection, pending) => {
+      pluginMediaSelection = mediaSelection
+      pendingMediaSelection = pending
+    },
     mediaRuntime: mediaTaskRuntime,
     btStorageRuntime: pluginRuntime.finalize,
     persistBtStorage: (task, source, target) =>
@@ -3224,7 +3240,10 @@ async function initializeMainProcess(): Promise<void> {
     builtinUpdater,
     overlayDir,
   })
+  if (!pendingMediaSelection)
+    throw new Error('Pending media selection is not initialized')
   const disposeQueryHandlers = registerQueryHandlers({
+    pendingMediaSelection,
     getResolvedLanguage: () => resolvedApplicationLocale,
     mediaMetaStore,
     cliToolService,

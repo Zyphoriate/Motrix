@@ -1,5 +1,13 @@
 {
   "mediaSelection": {
+    "pending": {
+      "notificationTitle": "请选择视频：{{title}}",
+      "notificationBody": "选择要下载的视频后即可继续。",
+      "selectVideos": "选择视频",
+      "actionRequired": "待操作",
+      "resolved": "已处理",
+      "badgeAria": "待选择视频：{{total}} 项"
+    },
     "title": "选择视频",
     "selectAll": "全选",
     "selectNone": "全不选",

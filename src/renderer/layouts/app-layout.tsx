@@ -1,5 +1,6 @@
 import { AddTaskDialogHost } from '@renderer/components/add-task-dialog/add-task-dialog-host'
 import { AppSidebar } from '@renderer/components/desktop-kit/sidebar/app-sidebar'
+import { MediaSelectionPendingHost } from '@renderer/components/media-selection-pending/media-selection-pending-host'
 import {
   RendererSubmissionNotice,
   RendererToaster,
@@ -165,6 +166,7 @@ export function AppLayout() {
           <OperationDialogHost />
           <EngineDiagnosticsDialogHost />
           {__MOTRIX_TARGET__ === 'web' && <AddTaskDialogHost />}
+          <MediaSelectionPendingHost />
           {__MOTRIX_TARGET__ === 'web' && <WindowTorrentDrop />}
         </PlatformServicesProvider>
       </RendererToaster>

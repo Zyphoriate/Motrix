@@ -36,6 +36,7 @@ import { PluginEngineVersionTooOld } from '@core/plugin/manifest/errors'
 import { PluginMediaSelectionService } from '@core/plugin/media-selection-service'
 import { PluginNetworkError } from '@core/plugin/network/plugin-network-error'
 import type { OperationService } from '@core/plugin/operations/operation-service'
+import { PendingMediaSelectionService } from '@core/plugin/pending-media-selection-service'
 import type { PluginRegistry } from '@core/plugin/plugin-registry'
 import type { RegistryClient } from '@core/plugin/registry/registry-client'
 import { downloadRegistryMoext } from '@core/plugin/registry/registry-fetcher'
@@ -194,6 +195,10 @@ const cliInstallRequestSchema = z
   .strict()
 
 export interface CommandContext {
+  onMediaSelectionReady?: (
+    mediaSelection: PluginMediaSelectionService,
+    pendingMediaSelection: PendingMediaSelectionService
+  ) => void
   mediaRuntime?: MediaTaskRuntime
   btStorageRuntime?: Pick<
     DurableFinalizeRuntime,
@@ -457,6 +462,36 @@ export function buildCommandHandlers(ctx: CommandContext): CommandHandlerMap {
     createTask: (input) => dispatchPluginMediaTask(input, createDeps),
   })
 
+  let pendingMediaSelection: PendingMediaSelectionService | undefined
+  const getPendingMediaSelection = () => {
+    pendingMediaSelection ??= new PendingMediaSelectionService({
+      db: motrixDatabase,
+      taskManager,
+      mediaSelection,
+      encrypt: (value) => capabilityHost.secrets.encrypt(value),
+      decrypt: (value) => capabilityHost.secrets.decrypt(value),
+      onChange: (change) => {
+        eventBus.emit(Events.PendingMediaSelectionsChanged)
+        publishTaskUpdateNow?.()
+        if (change.state === 'pending') {
+          const title = taskManager.getById(change.taskId)?.name ?? ''
+          notificationCenter.notify({
+            kind: 'media-selection-required',
+            severity: 'warning',
+            sourceKey: `media-selection-required:${change.taskId}`,
+            titleKey: 'mediaSelection.pending.notificationTitle',
+            bodyKey: 'mediaSelection.pending.notificationBody',
+            titleParams: { title },
+            taskId: change.taskId,
+          })
+        }
+      },
+    })
+    return pendingMediaSelection
+  }
+  if (ctx.onMediaSelectionReady)
+    ctx.onMediaSelectionReady(mediaSelection, getPendingMediaSelection())
+
   const log = getLogger('commands')
 
   // Shared by the singular AND plural task command handlers below — one
@@ -551,6 +586,10 @@ export function buildCommandHandlers(ctx: CommandContext): CommandHandlerMap {
   // Commands.ReAddTasks so the automatic and user-initiated paths match.
   bindTaskRetry?.((id) => reAddTask(id, reAddDeps))
   const removeDeps = {
+    pendingMediaSelection: {
+      cancel: (taskId: string, options?: { deleteParent?: boolean }) =>
+        getPendingMediaSelection().cancel(taskId, options),
+    },
     taskManager,
     adapter,
     log,
@@ -819,6 +858,12 @@ export function buildCommandHandlers(ctx: CommandContext): CommandHandlerMap {
       })
     },
 
+    [Commands.ConfirmPendingMediaSelection]: (request: unknown) =>
+      getPendingMediaSelection().confirm(request),
+    [Commands.CancelPendingMediaSelection]: (request: unknown) =>
+      getPendingMediaSelection().cancel(
+        z.object({ requestId: z.string().uuid() }).parse(request).requestId
+      ),
     [Commands.InspectPluginMedia]: (request: unknown) =>
       mediaSelection.inspect(request),
     [Commands.CreatePluginMediaTasks]: (request: unknown) =>

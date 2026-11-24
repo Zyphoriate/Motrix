@@ -25,6 +25,7 @@ import { PluginMediaSelectionService } from '@core/plugin/media-selection-servic
 import { PluginNetworkError } from '@core/plugin/network/plugin-network-error'
 import { operationHandlers } from '@core/plugin/operations/operation-handlers'
 import type { OperationService } from '@core/plugin/operations/operation-service'
+import { PendingMediaSelectionService } from '@core/plugin/pending-media-selection-service'
 import type { PluginRegistry } from '@core/plugin/plugin-registry'
 import type { RegistryClient } from '@core/plugin/registry/registry-client'
 import { scanForUpdates } from '@core/plugin/registry/update-scan'
@@ -124,6 +125,10 @@ import type { ServerDirectoryService } from '../server-directory-service'
 import { unsupportedLegacyImportCommands } from './legacy-import'
 
 export interface ServerCommandContext {
+  onMediaSelectionReady?: (
+    mediaSelection: PluginMediaSelectionService,
+    pendingMediaSelection: PendingMediaSelectionService
+  ) => void
   mediaRuntime?: MediaTaskRuntime
   updateService: Pick<ServerUpdateService, 'check' | 'setChannel'>
   userDataDir: string
@@ -339,6 +344,36 @@ export function buildServerCommandHandlers(
     createTask: (input) => dispatchPluginMediaTask(input, createDeps),
   })
 
+  let pendingMediaSelection: PendingMediaSelectionService | undefined
+  const getPendingMediaSelection = () => {
+    pendingMediaSelection ??= new PendingMediaSelectionService({
+      db: motrixDatabase,
+      taskManager,
+      mediaSelection,
+      encrypt: (value) => capabilityHost.secrets.encrypt(value),
+      decrypt: (value) => capabilityHost.secrets.decrypt(value),
+      onChange: (change) => {
+        eventBus.emit(Events.PendingMediaSelectionsChanged)
+        publishTaskUpdateNow?.()
+        if (change.state === 'pending') {
+          const title = taskManager.getById(change.taskId)?.name ?? ''
+          notificationCenter.notify({
+            kind: 'media-selection-required',
+            severity: 'warning',
+            sourceKey: `media-selection-required:${change.taskId}`,
+            titleKey: 'mediaSelection.pending.notificationTitle',
+            bodyKey: 'mediaSelection.pending.notificationBody',
+            titleParams: { title },
+            taskId: change.taskId,
+          })
+        }
+      },
+    })
+    return pendingMediaSelection
+  }
+  if (ctx.onMediaSelectionReady)
+    ctx.onMediaSelectionReady(mediaSelection, getPendingMediaSelection())
+
   const log = getLogger('server:commands')
 
   // Shared by the singular AND plural task command handlers below — one
@@ -440,6 +475,10 @@ export function buildServerCommandHandlers(
   // Commands.ReAddTasks so the automatic and user-initiated paths match.
   bindTaskRetry?.((id) => reAddTask(id, reAddDeps))
   const removeDeps = {
+    pendingMediaSelection: {
+      cancel: (taskId: string, options?: { deleteParent?: boolean }) =>
+        getPendingMediaSelection().cancel(taskId, options),
+    },
     authorizeTaskRemoval: ctx.authorizeTaskRemoval,
     fileCleanupForTask: ctx.fileCleanupForTask,
     cancelMedia: ctx.cancelMedia,
@@ -549,6 +588,17 @@ export function buildServerCommandHandlers(
       return { ok: true }
     },
 
+    [Commands.ConfirmPendingMediaSelection]: (request: unknown) => {
+      const operation = () => getPendingMediaSelection().confirm(request)
+      return ctx.trackAsyncWork ? ctx.trackAsyncWork(operation) : operation()
+    },
+    [Commands.CancelPendingMediaSelection]: (request: unknown) => {
+      const operation = () =>
+        getPendingMediaSelection().cancel(
+          z.object({ requestId: z.string().uuid() }).parse(request).requestId
+        )
+      return ctx.trackAsyncWork ? ctx.trackAsyncWork(operation) : operation()
+    },
     [Commands.InspectPluginMedia]: (request: unknown) =>
       mediaSelection.inspect(request),
     [Commands.CreatePluginMediaTasks]: async (request: unknown) => {

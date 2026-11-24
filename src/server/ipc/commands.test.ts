@@ -425,6 +425,22 @@ it('drains active media before manually restarting the server engine', async () 
   expect(ctx.supervisor.restart).toHaveBeenCalledOnce()
 })
 
+describe('server pending media mutation admission', () => {
+  it.each([
+    Commands.ConfirmPendingMediaSelection,
+    Commands.CancelPendingMediaSelection,
+  ])('admits %s before accessing the pending queue', async (command) => {
+    const ctx = makeFakeCtx()
+    const stopped = new Error('Shell work has stopped')
+    const trackAsyncWork = vi.fn(async () => {
+      throw stopped
+    })
+    const handlers = buildServerCommandHandlers({ ...ctx, trackAsyncWork })
+    await expect(handlers[command]!({})).rejects.toBe(stopped)
+    expect(trackAsyncWork).toHaveBeenCalledOnce()
+  })
+})
+
 describe('server application update checks', () => {
   it('applies the persisted channel to subsequent version checks', async () => {
     const ctx = makeFakeCtx()

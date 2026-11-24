@@ -90,6 +90,45 @@ describe('<NotificationsNavItem>', () => {
     vi.useRealTimers()
   })
 
+  it('keeps an actionable amber badge after history is read or cleared, even with hidden badges', async () => {
+    let pending = [
+      {
+        requestId: 'e41039c7-34c9-49c6-82e1-057e109fe5f7',
+        taskId: 'e41039c7-34c9-49c6-82e1-057e109fe5f7',
+        title: 'Video',
+        createdAt: 1,
+        expiresAt: 9999999999999,
+        saveDir: '/downloads',
+      },
+    ]
+    vi.mocked(transport.invoke).mockImplementation(async (channel) => {
+      if (channel === Queries.GetSettings)
+        return { app: { notificationBadgeStyle: 'hidden' } }
+      if (channel === Queries.GetUnreadNotificationCount) return 0
+      if (channel === Queries.ListPendingMediaSelections) return pending
+    })
+    renderNavItem()
+    const badge = await screen.findByTestId('notification-badge')
+    expect(badge).toHaveTextContent('1')
+    expect(badge).toHaveAttribute('aria-label', 'Pending video selections: 1')
+    expect(badge).toHaveClass('bg-amber-400')
+    const historyChanged = vi
+      .mocked(transport.on)
+      .mock.calls.find(
+        (call) => call[0] === Events.NotificationsChanged
+      )?.[1] as () => void
+    await act(async () => historyChanged())
+    expect(screen.getByTestId('notification-badge')).toBeVisible()
+    pending = []
+    const queueChanged = vi
+      .mocked(transport.on)
+      .mock.calls.find(
+        (call) => call[0] === Events.PendingMediaSelectionsChanged
+      )?.[1] as () => void
+    await act(async () => queueChanged())
+    expect(screen.queryByTestId('notification-badge')).not.toBeInTheDocument()
+  })
+
   it('shows an accessible dot without announcing a numeric obligation', async () => {
     mockInvoke(7, 'dot')
     renderNavItem()
@@ -294,9 +333,21 @@ describe('<NotificationsNavItem>', () => {
     // invocationCallOrder precedent: the `on()` registration must have
     // happened before the FIRST `invoke()` call (ListNotifications, the
     // hook's first snapshot query).
-    const lastOnOrder = Math.max(...onMock.mock.invocationCallOrder)
-    const firstInvokeOrder = invokeMock.mock.invocationCallOrder[0]
-    expect(firstInvokeOrder).toBeGreaterThan(lastOnOrder)
+    for (const [event, query] of [
+      [Events.NotificationsChanged, Queries.GetSettings],
+      [
+        Events.PendingMediaSelectionsChanged,
+        Queries.ListPendingMediaSelections,
+      ],
+    ]) {
+      const subscription = onCalls.findIndex((call) => call[0] === event)
+      const snapshot = invokeMock.mock.calls.findIndex(
+        (call) => call[0] === query
+      )
+      expect(invokeMock.mock.invocationCallOrder[snapshot]).toBeGreaterThan(
+        onMock.mock.invocationCallOrder[subscription]
+      )
+    }
   })
 
   it('does not require NotificationAdded to refresh the badge', async () => {

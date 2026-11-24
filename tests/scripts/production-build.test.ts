@@ -17,9 +17,11 @@ const TARGETS = [
   // in lazy chunks. Reserve a further 64 KiB; retain the startup ceiling.
   // Plugin media selection and its 26 locale catalogs add ~12 KiB beyond
   // the previous total budgets. Reserve 16 KiB; keep startup ceilings fixed.
-  { name: 'renderer', initial: 2.75 * MIB, total: 8 * MIB + 144 * 1024 },
+  // Durable pending-media UI and 26 localized action prompts add 6–9 KiB.
+  // Reserve 16 KiB of total output; do not widen the startup ceiling.
+  { name: 'renderer', initial: 2.75 * MIB, total: 8 * MIB + 160 * 1024 },
   // The lazy DSM storage recovery page and its localized controls add 9 KiB.
-  { name: 'renderer.web', initial: 2.75 * MIB, total: 8 * MIB + 188 * 1024 },
+  { name: 'renderer.web', initial: 2.75 * MIB, total: 8 * MIB + 204 * 1024 },
   // The shared operation runtime brings total server JS to ~5.01 MiB.
   { name: 'server', initial: 2 * MIB, total: 5.25 * MIB },
 ]

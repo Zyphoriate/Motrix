@@ -1,4 +1,5 @@
 import { Toolbar as ToolbarPrimitive } from '@base-ui/react/toolbar'
+import { usePendingMediaSelectionStore } from '@renderer/components/media-selection-pending/store'
 import { RedownloadOverwriteDialogHost } from '@renderer/routes/downloads/inspector/redownload-overwrite-dialog-host'
 import { useRedownloadOverwriteStore } from '@renderer/routes/downloads/inspector/redownload-overwrite-store'
 import { RemoveTasksDialogHost } from '@renderer/routes/downloads/inspector/remove-tasks-dialog-host'
@@ -468,6 +469,27 @@ describe('TaskActionsMenu', () => {
         '\\\\nas\\share\\模型 文件.bin'
       )
     )
+  })
+  it('opens the media queue instead of the magnet picker for a waiting HTTP parent', async () => {
+    const requestId = '6a894e0f-eac2-41e2-9911-dadf4603fb73'
+    usePendingMediaSelectionStore.setState({ requestId: null })
+    setup(true, [
+      makeDownloadTask({
+        id: 'a',
+        name: 'a',
+        type: TaskType.Http,
+        status: TaskStatus.MetadataReady,
+        pendingMediaSelection: { requestId },
+      }),
+    ])
+    fireEvent.contextMenu(screen.getByText('a'))
+    fireEvent.click(
+      await screen.findByRole('menuitem', { name: 'Select files' })
+    )
+    await waitFor(() =>
+      expect(usePendingMediaSelectionStore.getState().requestId).toBe(requestId)
+    )
+    expect(openMagnetFileSelection).not.toHaveBeenCalled()
   })
   it('opens file selection for a magnet whose metadata is ready', async () => {
     setup(true, [

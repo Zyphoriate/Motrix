@@ -30,6 +30,7 @@ export function mapStatusToPhase(
   switch (s) {
     case TaskStatus.Queued:
       return 'queued'
+    case TaskStatus.MetadataReady:
     case TaskStatus.FetchingMetadata:
       // Still pre-download; closest MDXP phase is 'queued'.
       return 'queued'
@@ -44,7 +45,7 @@ export function mapStatusToPhase(
       // Post-download BT seeding; closest MDXP phase is 'finalizing'.
       return 'finalizing'
     default:
-      // Completed/Error/Removed/MetadataReady don't normally reach a progress
+      // Completed/Error/Removed don't normally reach a progress
       // push; 'finalizing' is the safe fallback.
       return 'finalizing'
   }

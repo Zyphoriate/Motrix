@@ -73,6 +73,26 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('pending magnet selection recovery', () => {
+  it('skips HTTP waiting parents and recovers the next magnet instead', async () => {
+    taskList.tasks = [
+      makeDownloadTask({
+        id: 'http',
+        type: TaskType.Http,
+        status: TaskStatus.MetadataReady,
+        pendingMediaSelection: {
+          requestId: '6a894e0f-eac2-41e2-9911-dadf4603fb73',
+        },
+      }),
+      ready('magnet'),
+    ]
+    renderHook(() => usePendingMagnetSelection())
+    await waitFor(() => expect(displayedTaskId()).toBe('magnet'))
+    expect(transport.invoke).not.toHaveBeenCalledWith(
+      Commands.ReopenMagnetFileSelection,
+      'http'
+    )
+  })
+
   it('keeps event-driven selection open while the task snapshot still shows metadata fetching', () => {
     taskList.tasks = [
       { ...ready('resolving'), status: TaskStatus.FetchingMetadata },

@@ -8,11 +8,13 @@ import type {
   TaskCreateCommandResult,
   TaskCreateRequest,
 } from '@shared/schemas/add-task'
+import { isPendingMediaSelectionTask } from '@shared/schemas/pending-media-selection'
 import type { MotrixAppSettings } from '@shared/types/settings'
 import {
   type DownloadTask,
   TaskInstancePhase,
   TaskStatus,
+  TaskType,
 } from '@shared/types/task'
 
 interface MagnetSelectionTimeoutDeps {
@@ -82,7 +84,9 @@ export class MagnetSelectionTimeout {
       !settings.magnetFileSelection ||
       !settings.magnetFileSelectionAutoDownload ||
       !this.deps.isEngineReady() ||
-      task.status !== TaskStatus.MetadataReady
+      task.status !== TaskStatus.MetadataReady ||
+      (task.type !== TaskType.Magnet && task.type !== TaskType.Bt) ||
+      isPendingMediaSelectionTask(task)
     )
       return undefined
     return (

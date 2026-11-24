@@ -4090,6 +4090,46 @@ describe('SessionManager', () => {
 })
 
 describe('restore() with task_instances (Plan A Task 7)', () => {
+  it('restores pending media as metadata ready without engine or filesystem replay', async () => {
+    const taskManager = new TaskManager()
+    const db = createMockDb()
+    const rpc = createMockRpc()
+    const adapter = createMockAdapter()
+    const sm = new SessionManager(taskManager, rpc, db, adapter)
+    const requestId = 'fa9b3a9b-6b18-4a59-9882-4b53969806f7'
+    db.saveTaskWithInstances({
+      task: {
+        ...makeTaskRow('pending-media', TaskKind.Direct),
+        aggStatus: TaskStatus.MetadataReady,
+        finalPath: '',
+      },
+      instances: [
+        {
+          ...makeInstanceRow(
+            'pending-instance',
+            'pending-media',
+            null,
+            TaskInstancePhase.HttpDownload
+          ),
+          status: TaskStatus.MetadataReady,
+          uris: ['https://www.bilibili.com/video/BV1GJ411x7h7'],
+          diskPath: '',
+          payload: { pendingMediaSelection: requestId },
+        },
+      ],
+    })
+    await sm.restore()
+    expect(taskManager.getById('pending-media')).toMatchObject({
+      status: TaskStatus.MetadataReady,
+      engineTaskId: '',
+      diskPath: '',
+      finalPath: '',
+      pendingMediaSelection: { requestId },
+    })
+    expect(adapter.createDownload).not.toHaveBeenCalled()
+    expect(adapter.addTorrent).not.toHaveBeenCalled()
+  })
+
   it('matches aria2 GID against task_instances.gid first', async () => {
     const taskManager = new TaskManager()
     const db = createMockDb()

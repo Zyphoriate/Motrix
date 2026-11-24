@@ -412,6 +412,10 @@ export async function syncNativeMessagingManifests(args: {
 }
 
 export async function bootstrapBridge(args: {
+  inspectMedia?: BridgeReceiverDeps['inspectMedia']
+  enqueuePendingMediaSelection?: BridgeReceiverDeps['enqueuePendingMediaSelection']
+  cancelPendingMediaSelection?: BridgeReceiverDeps['cancelPendingMediaSelection']
+  getPendingMediaSelectionChildTaskIds?: BridgeReceiverDeps['getPendingMediaSelectionChildTaskIds']
   mediaRuntime?: import('@core/bridge-receiver/media-task-runtime').MediaTaskRuntime
   extensionHandoff?: ExtensionHandoffModule
   getMainWindow: () => Electron.BrowserWindow | null
@@ -610,6 +614,11 @@ export async function bootstrapBridge(args: {
       args.pluginHost
     )
     const receiver = new BridgeReceiver({
+      inspectMedia: args.inspectMedia,
+      enqueuePendingMediaSelection: args.enqueuePendingMediaSelection,
+      cancelPendingMediaSelection: args.cancelPendingMediaSelection,
+      getPendingMediaSelectionChildTaskIds:
+        args.getPendingMediaSelectionChildTaskIds,
       mediaRuntime: args.mediaRuntime,
       mediaMetaStore: args.mediaMetaStore,
       getDefaultSaveDir: args.getDefaultSaveDir,

@@ -67,7 +67,9 @@ import {
   parsePluginIdleDisposeMs,
 } from '@core/plugin/host/plugin-host'
 import { PluginInstaller } from '@core/plugin/install/plugin-installer'
+import type { PluginMediaSelectionService } from '@core/plugin/media-selection-service'
 import { PluginHttpClient } from '@core/plugin/network/plugin-http-client'
+import type { PendingMediaSelectionService } from '@core/plugin/pending-media-selection-service'
 import { PluginRegistry } from '@core/plugin/plugin-registry'
 import { RegistryClient } from '@core/plugin/registry/registry-client'
 import type { PluginHookRuntime } from '@core/plugin/runtime/plugin-hook-runtime'
@@ -1397,7 +1399,13 @@ async function main() {
     segmentAria2: mediaRuntime.segmentAria2,
     tmpRoot: mediaRuntime.tmpRoot,
   })
+  let pendingMediaSelection!: PendingMediaSelectionService
+  let pluginMediaSelection: PluginMediaSelectionService
   const commandHandlers = buildServerCommandHandlers({
+    onMediaSelectionReady: (mediaSelection, pending) => {
+      pluginMediaSelection = mediaSelection
+      pendingMediaSelection = pending
+    },
     mediaRuntime: mediaTaskRuntime,
     updateService,
     userDataDir: platform.userDataDir,
@@ -1499,7 +1507,10 @@ async function main() {
       magnetTracker.stopAndDrain(),
     ])
   }
+  if (!pendingMediaSelection)
+    throw new Error('Pending media selection is not initialized')
   const queryHandlers = buildServerQueryHandlers({
+    pendingMediaSelection,
     updateService,
     getResolvedLanguage: () => hostLanguage,
     mediaMetaStore,
@@ -2187,6 +2198,7 @@ async function main() {
     // only the optional listener/runtime portion.
     bridgeRuntimeFactory = async (): Promise<ServerBridgeRuntime> => {
       const removeTaskDeps = {
+        pendingMediaSelection,
         authorizeTaskRemoval: nasTaskAccess?.authorizeRemoval,
         cancelMedia: (taskId: string) => mediaTaskRuntime.cancelMedia(taskId),
         taskManager,
@@ -2356,6 +2368,16 @@ async function main() {
         trustedExtensionRegistry,
         createExtensionReceiver: ({ bridgeBus }) =>
           new BridgeReceiver({
+            inspectMedia: (url) => pluginMediaSelection.inspect({ url }),
+            enqueuePendingMediaSelection: async (input) =>
+              pendingMediaSelection.enqueue({
+                ...input,
+                saveDir: await downloadPathPolicy.prepareSaveDir(input.saveDir),
+              }),
+            cancelPendingMediaSelection: (taskId) =>
+              pendingMediaSelection.cancel(taskId),
+            getPendingMediaSelectionChildTaskIds: (taskId) =>
+              pendingMediaSelection.getChildTaskIds(taskId),
             mediaRuntime: mediaTaskRuntime,
             resolveMedia: makePluginMediaResolver(pluginRegistry, pluginHost),
             mediaMetaStore,

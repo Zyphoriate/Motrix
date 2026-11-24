@@ -12,6 +12,7 @@ import type { NotificationCenter } from '@core/notifications/notification-center
 import type { CapabilityHost } from '@core/plugin/capabilities/interface'
 import { readCommandGraph } from '@core/plugin/commands/command-graph'
 import type { GrantsManager } from '@core/plugin/grants/grants-manager'
+import type { PendingMediaSelectionService } from '@core/plugin/pending-media-selection-service'
 import type { PluginRegistry } from '@core/plugin/plugin-registry'
 import {
   buildContributionIndex,
@@ -109,6 +110,7 @@ const UNSUPPORTED_APPIMAGE_INTEGRATION: AppImageIntegrationView = {
 }
 
 export interface ServerQueryContext {
+  pendingMediaSelection?: PendingMediaSelectionService
   updateService: Pick<ServerUpdateService, 'getState'>
   getResolvedLanguage: () => SupportedLocale
   taskManager: TaskManager
@@ -180,6 +182,14 @@ export function buildServerQueryHandlers(
   })
 
   return {
+    [Queries.ListPendingMediaSelections]: async () =>
+      ctx.pendingMediaSelection?.list() ?? [],
+    [Queries.GetPendingMediaSelection]: async (request: unknown) => {
+      const { requestId } = z
+        .object({ requestId: z.string().uuid() })
+        .parse(request)
+      return ctx.pendingMediaSelection?.get(requestId) ?? null
+    },
     ...unsupportedLegacyImportQueries(),
     [Queries.GetFfmpegInstallStatus]: async (payload: unknown) => {
       z.undefined().parse(payload)

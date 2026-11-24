@@ -30,6 +30,19 @@ function input(): PluginMediaTaskInput {
     saveDir: '/requested',
     connections: 8,
     pluginId: 'resolver',
+    requestId: 'fa9b3a9b-6b18-4a59-9882-4b53969806f7',
+    source: 'bridge',
+    sourceMeta: {
+      kind: 'hls',
+      extensionId: 'extension.test',
+      browser: 'chromium',
+      sessionKey: 'session',
+      pageUrl: 'https://example.test/watch/1',
+      pageTitle: 'Episode 1',
+      qualityLabel: '1080p',
+      durationSec: null,
+      submittedAt: 1,
+    },
   }
 }
 
@@ -71,7 +84,7 @@ describe('dispatchPluginMediaTask', () => {
         audioUrl: 'https://audio.test/a',
         videoHeaders: { Referer: 'https://example.test/' },
         audioHeaders: { Authorization: 'Bearer audio' },
-        sourceMeta: null,
+        sourceMeta: input().sourceMeta,
       })
     )
     expect(host.adapter.createDownload).not.toHaveBeenCalled()

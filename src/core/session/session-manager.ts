@@ -19,6 +19,7 @@ import {
   DownloadSourceError,
 } from '@core/task/source-admission'
 import { parseDirectReplayRecipe } from '@shared/schemas/direct-replay-recipe'
+import { isPendingMediaSelectionTask } from '@shared/schemas/pending-media-selection'
 import type { DownloadTask } from '@shared/types/task'
 import {
   makeDefaultBtExtension,
@@ -1183,6 +1184,20 @@ export class SessionManager {
       if (pair.instances.some((i) => i.gid && aria2GidSet.has(i.gid))) continue
 
       const primary = pair.instances[0]
+      const pendingSelection = taskRowToDownloadTask(pair.task, pair.instances)
+      if (isPendingMediaSelectionTask(pendingSelection)) {
+        pendingSelection.status = TaskStatus.MetadataReady
+        pendingSelection.engineTaskId = ''
+        pendingSelection.diskPath = ''
+        pendingSelection.finalPath = ''
+        for (const instance of pendingSelection.instances) {
+          instance.gid = null
+          instance.status = TaskStatus.MetadataReady
+          instance.diskPath = ''
+        }
+        this.taskManager.set(pendingSelection.id, pendingSelection)
+        continue
+      }
       if (hasLegacyImport(pair)) {
         // A migrated task can be recovered only by its durable token/GID service.
         // Preserve its identity and originals when the engine loses its bound row.
