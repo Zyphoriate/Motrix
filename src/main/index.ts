@@ -52,6 +52,7 @@ import { NotificationCenter } from '@core/notifications/notification-center'
 import { createNotificationOccurrenceConsumer } from '@core/notifications/occurrence-consumer'
 import { projectActiveToLegacy } from '@core/plugin/capabilities/ffmpeg-detect'
 import { wireCommandSystem } from '@core/plugin/commands/wire'
+import { pluginSecretFields } from '@core/plugin/configuration-schema'
 import type { NativeFinalizeFilesystemAdapter } from '@core/plugin/finalize/filesystem-adapter'
 import { resolveFinalizeSidecarPath } from '@core/plugin/finalize/sidecar-path'
 import { GrantsManager } from '@core/plugin/grants/grants-manager'
@@ -2257,10 +2258,9 @@ async function initializeMainProcess(): Promise<void> {
     userDataDir: app.getPath('userData'),
     pluginsDir,
     settingsManager,
-    // TODO Task 22: wire settingsManager.snapshot()?.plugins?.[pluginId] ?? {}
-    configReader: (_pluginId) => ({}),
-    // TODO Plan F: derive from manifest contributes.configuration schema
-    secretFieldsFor: (_pluginId) => new Set(),
+    configReader: (pluginId) => settingsManager.get().plugins[pluginId] ?? {},
+    secretFieldsFor: (pluginId) =>
+      pluginSecretFields(pluginRegistry.get(pluginId)?.manifest),
     manifestCommandIdsFor: (pluginId) => {
       const cmds = pluginRegistry.get(pluginId)?.manifest.contributes.commands
       return new Set(cmds?.map((c) => c.id) ?? [])

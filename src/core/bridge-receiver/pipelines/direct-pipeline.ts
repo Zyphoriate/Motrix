@@ -36,6 +36,7 @@ export class DirectPipeline {
     const { taskId } = await this.deps
       .createTask(req, undefined, {
         source: 'bridge',
+        ...(adapted.mediaResolved ? { mediaResolved: true as const } : {}),
         sourceMeta: adapted.sourceMeta,
         // Even [] requests an isolated task cookie jar in the engine.
         cookies: adapted.cookies,

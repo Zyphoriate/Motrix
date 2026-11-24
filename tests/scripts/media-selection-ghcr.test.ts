@@ -30,6 +30,7 @@ describe('fork GHCR publication boundary', () => {
       'workflow_dispatch',
     ])
     expect(workflow.on.push?.branches).toEqual([
+      'main',
       'feat/plugin_media_selection_20261123',
     ])
     expect(workflow.jobs.publish.if).toBe(

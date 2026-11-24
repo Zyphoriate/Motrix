@@ -29,6 +29,7 @@ export interface AdapterDeps {
 }
 
 export interface AdaptedDirect {
+  mediaResolved?: true
   taskId: string
   saveDir: string
   finalName: string

@@ -145,7 +145,7 @@ describe('PluginSettingsForm', () => {
           type: 'string',
           title: 'Preferred quality',
           enum: ['highest', '2160p', '1440p', '1080p', '720p', '480p'],
-          enumLabels: { highest: 'Highest', '2160p': '4K (2160P)' },
+          enumLabels: { highest: '最高', '2160p': '4K (2160P)' },
           default: 'highest',
         },
         showSinglePartDialog: {
@@ -170,7 +170,7 @@ describe('PluginSettingsForm', () => {
     await user.click(
       screen.getByRole('combobox', { name: 'Preferred quality' })
     )
-    await user.click(await screen.findByRole('option', { name: 'Highest' }))
+    await user.click(await screen.findByRole('option', { name: '最高' }))
     await user.click(
       screen.getByRole('switch', { name: 'Show picker for single-part videos' })
     )
@@ -191,7 +191,7 @@ describe('PluginSettingsForm', () => {
     )
     expect(
       screen.getByRole('combobox', { name: 'Preferred quality' })
-    ).toHaveTextContent('Highest')
+    ).toHaveTextContent('最高')
     expect(
       screen.getByRole('switch', { name: 'Show picker for single-part videos' })
     ).toBeChecked()

@@ -14,6 +14,7 @@ import { TrustedExtensionRegistry } from '@core/bridge/trusted-extension-registr
 import { BridgeReceiver } from '@core/bridge-receiver/bridge-receiver'
 import { createDownloadDirectories } from '@core/bridge-receiver/download-directories'
 import { MediaTaskRuntime } from '@core/bridge-receiver/media-task-runtime'
+import { makePluginMediaResolver } from '@core/bridge-receiver/plugin-media-resolver'
 import { Aria2Adapter } from '@core/engine/aria2/aria2-adapter'
 import { Aria2ConfigBuilder } from '@core/engine/aria2/aria2-config-builder'
 import { Aria2ProcessManager } from '@core/engine/aria2/aria2-process-manager'
@@ -2216,6 +2217,12 @@ async function main() {
       }
       const createTaskDeps = {
         adapter,
+        orchestrator: hookOrchestrator,
+        auditLog: hookAuditLog,
+        resolveMedia: makePluginMediaResolver(pluginRegistry, pluginHost),
+        dispatchMux: (
+          adapted: import('@core/bridge-receiver/submit-download-adapter').AdaptedMux
+        ) => mediaTaskRuntime.muxPipeline.dispatch(adapted),
         directResourceValidator: new DirectResourceValidatorService(),
         directResourceProxyPolicy: appliedDownloadProxyPolicy,
         settingsManager,
@@ -2350,6 +2357,7 @@ async function main() {
         createExtensionReceiver: ({ bridgeBus }) =>
           new BridgeReceiver({
             mediaRuntime: mediaTaskRuntime,
+            resolveMedia: makePluginMediaResolver(pluginRegistry, pluginHost),
             mediaMetaStore,
             getDefaultSaveDir: () => settingsManager.getApp().defaultSaveDir,
             resolveSaveDir: downloadDirectories.resolveSelection,
@@ -2361,7 +2369,14 @@ async function main() {
             pickName: (saveDir, desired) =>
               finalNamePicker.pick(saveDir, desired),
             createTask: (request, _deps, options) =>
-              handleCreateTask(request, createTaskDeps, options),
+              handleCreateTask(
+                request,
+                {
+                  ...createTaskDeps,
+                  resolveMedia: undefined,
+                },
+                options
+              ),
             removeTask: async (taskId) => {
               if (!taskManager.getById(taskId)) return
               await removeTask(
