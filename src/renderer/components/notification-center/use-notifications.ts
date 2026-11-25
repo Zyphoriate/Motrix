@@ -8,6 +8,7 @@ import {
   type NotificationBadgeStyle,
   notificationBadgeStyleSchema,
 } from '@shared/schemas/app-settings'
+import { PendingMediaSelectionListSchema } from '@shared/schemas/pending-media-selection'
 import type { AppNotification } from '@shared/types/notification'
 import type { AppSettings } from '@shared/types/settings'
 import { useCallback, useState } from 'react'
@@ -28,6 +29,7 @@ export interface UseNotificationsResult {
   items: AppNotification[]
   unreadCount: number
   badgeStyle: NotificationBadgeStyle
+  pendingNotificationCount: number
   markRead: (id: string) => Promise<void>
   markAllRead: () => Promise<void>
   remove: (id: string) => Promise<void>
@@ -51,9 +53,10 @@ export interface UseNotificationsResult {
  *
  * `{ countOnly: true }` (e.g. `NotificationsNavItem`, the always-mounted
  * sidebar badge) skips the `ListNotifications` invoke and leaves `items`
- * at `[]` — the return shape is unchanged so callers that only destructure
- * `unreadCount` need no other change. The badge preference is loaded
- * before publishing the count so a hidden badge never flashes at startup.
+ * at `[]`. It also intersects all retained media notification task IDs with
+ * the independent pending queue, including already-read notifications. Both
+ * history and queue changes refresh this single mirror. The badge preference
+ * is loaded before publishing counts so a hidden badge never flashes at startup.
  *
  * Mutations (`markRead`/`markAllRead`/`remove`/`clear`) only invoke the
  * matching `Commands` and rely on the `NotificationsChanged` broadcast the
@@ -72,6 +75,7 @@ export function useNotifications(
   const { countOnly = false } = options
   const [items, setItems] = useState<AppNotification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
+  const [pendingNotificationCount, setPendingNotificationCount] = useState(0)
   const [badgeStyle, setBadgeStyle] = useState<NotificationBadgeStyle>('count')
 
   const load = useCallback(
@@ -92,6 +96,21 @@ export function useNotifications(
       if (stale()) return
       const count = (await read(Queries.GetUnreadNotificationCount)) as number
       if (stale()) return
+      let pendingCount = 0
+      if (countOnly) {
+        const notificationTaskIds = new Set(
+          (await read(Queries.ListPendingMediaNotificationTaskIds)) as string[]
+        )
+        if (stale()) return
+        const selections = PendingMediaSelectionListSchema.parse(
+          (await read(Queries.ListPendingMediaSelections)) ?? []
+        )
+        if (stale()) return
+        pendingCount = selections.filter((selection) =>
+          notificationTaskIds.has(selection.taskId)
+        ).length
+      }
+      setPendingNotificationCount(pendingCount)
       setItems(list)
       setUnreadCount(count)
       setBadgeStyle(style)
@@ -100,7 +119,9 @@ export function useNotifications(
   )
 
   const { refresh } = useTransportMirror({
-    events: [Events.NotificationsChanged],
+    events: countOnly
+      ? [Events.NotificationsChanged, Events.PendingMediaSelectionsChanged]
+      : [Events.NotificationsChanged],
     refreshOnSettingsSave: true,
     load,
   })
@@ -125,6 +146,7 @@ export function useNotifications(
     items,
     unreadCount,
     badgeStyle,
+    pendingNotificationCount,
     markRead,
     markAllRead,
     remove,

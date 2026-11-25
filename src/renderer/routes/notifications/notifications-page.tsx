@@ -310,11 +310,10 @@ export function NotificationsPage() {
             </ToolbarButton>
             <ToolbarButton
               label={t('notification.center.clearAll')}
-              disabled={(!hasItems && pendingSelections.length === 0) || busy}
+              disabled={!hasItems || busy}
               onClick={() =>
                 void runAction(async () => {
                   await clear()
-                  await refreshPending()
                   await refresh()
                 }, 'notification.center.clearFailed')
               }
@@ -371,7 +370,6 @@ export function NotificationsPage() {
                     onDelete={() =>
                       void runAction(async () => {
                         await remove(item.id)
-                        await refreshPending()
                         await refresh()
                       })
                     }

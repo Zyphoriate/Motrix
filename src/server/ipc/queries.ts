@@ -419,6 +419,9 @@ export function buildServerQueryHandlers(
 
     [Queries.ListNotifications]: async () => notificationCenter.list(),
 
+    [Queries.ListPendingMediaNotificationTaskIds]: async () =>
+      notificationCenter.listPendingMediaNotificationTaskIds(),
+
     [Queries.GetUnreadNotificationCount]: async () =>
       notificationCenter.unreadCount(),
 

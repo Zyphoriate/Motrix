@@ -62,6 +62,8 @@ beforeAll(() => {
 function mockInvoke(count: number, notificationBadgeStyle = 'count') {
   vi.mocked(transport.invoke).mockImplementation(async (ch: string) => {
     if (ch === Queries.GetSettings) return { app: { notificationBadgeStyle } }
+    if (ch === Queries.ListPendingMediaNotificationTaskIds) return []
+    if (ch === Queries.ListPendingMediaSelections) return []
     if (ch === Queries.ListNotifications) return []
     if (ch === Queries.GetUnreadNotificationCount) return count
     return undefined
@@ -90,8 +92,8 @@ describe('<NotificationsNavItem>', () => {
     vi.useRealTimers()
   })
 
-  it('keeps an amber badge after reading and removes it when notification deletion settles the queue', async () => {
-    let pending = [
+  it('keeps read pending notifications amber and hides deleted notifications without settling the queue', async () => {
+    const pending = [
       {
         requestId: 'e41039c7-34c9-49c6-82e1-057e109fe5f7',
         taskId: 'e41039c7-34c9-49c6-82e1-057e109fe5f7',
@@ -101,7 +103,10 @@ describe('<NotificationsNavItem>', () => {
         saveDir: '/downloads',
       },
     ]
+    let notificationTaskIds = [pending[0]!.taskId]
     vi.mocked(transport.invoke).mockImplementation(async (channel) => {
+      if (channel === Queries.ListPendingMediaNotificationTaskIds)
+        return notificationTaskIds
       if (channel === Queries.GetSettings)
         return { app: { notificationBadgeStyle: 'hidden' } }
       if (channel === Queries.GetUnreadNotificationCount) return 0
@@ -119,15 +124,81 @@ describe('<NotificationsNavItem>', () => {
       )?.[1] as () => void
     await act(async () => historyChanged())
     expect(screen.getByTestId('notification-badge')).toBeVisible()
-    pending = []
+    notificationTaskIds = []
+    await act(async () => historyChanged())
+    expect(screen.queryByTestId('notification-badge')).not.toBeInTheDocument()
+    expect(pending).toHaveLength(1)
+    notificationTaskIds = [pending[0]!.taskId]
     const queueChanged = vi
       .mocked(transport.on)
       .mock.calls.find(
         (call) => call[0] === Events.PendingMediaSelectionsChanged
       )?.[1] as () => void
     await act(async () => queueChanged())
-    expect(screen.queryByTestId('notification-badge')).not.toBeInTheDocument()
+    expect(screen.getByTestId('notification-badge')).toHaveClass('bg-amber-400')
   })
+
+  it('counts only the intersection of retained notification IDs and pending tasks', async () => {
+    mockInvoke(0)
+    const original = vi.mocked(transport.invoke).getMockImplementation()!
+    vi.mocked(transport.invoke).mockImplementation(async (channel, ...args) => {
+      if (channel === Queries.ListPendingMediaNotificationTaskIds)
+        return [
+          '00000000-0000-4000-8000-000000000001',
+          '00000000-0000-4000-8000-000000000003',
+          '00000000-0000-4000-8000-000000000001',
+        ]
+      if (channel === Queries.ListPendingMediaSelections)
+        return [
+          '00000000-0000-4000-8000-000000000001',
+          '00000000-0000-4000-8000-000000000002',
+        ].map((taskId) => ({
+          requestId: taskId,
+          taskId,
+          title: 'Video',
+          createdAt: 1,
+          expiresAt: 9999999999999,
+          saveDir: '/downloads',
+        }))
+      return original(channel, ...args)
+    })
+    renderNavItem()
+    expect(await screen.findByTestId('notification-badge')).toHaveTextContent(
+      '1'
+    )
+  })
+
+  it.each([
+    Queries.ListPendingMediaNotificationTaskIds,
+    Queries.ListPendingMediaSelections,
+  ])(
+    'retains the last badge when %s fails and converges on the next event',
+    async (failedQuery) => {
+      mockInvoke(3)
+      renderNavItem()
+      expect(await screen.findByTestId('notification-badge')).toHaveTextContent(
+        '3'
+      )
+      mockInvoke(8)
+      const original = vi.mocked(transport.invoke).getMockImplementation()!
+      vi.mocked(transport.invoke).mockImplementation(
+        async (channel, ...args) => {
+          if (channel === failedQuery) throw new Error('Disconnected')
+          return original(channel, ...args)
+        }
+      )
+      const changed = vi
+        .mocked(transport.on)
+        .mock.calls.find(
+          ([channel]) => channel === Events.NotificationsChanged
+        )![1] as () => void
+      await act(async () => changed())
+      expect(screen.getByTestId('notification-badge')).toHaveTextContent('3')
+      mockInvoke(8)
+      await act(async () => changed())
+      expect(screen.getByTestId('notification-badge')).toHaveTextContent('8')
+    }
+  )
 
   it('shows an accessible dot without announcing a numeric obligation', async () => {
     mockInvoke(7, 'dot')
@@ -314,7 +385,7 @@ describe('<NotificationsNavItem>', () => {
     expect(link).toHaveAttribute('href', '/notifications')
   })
 
-  it('subscribes to NotificationsChanged only, strictly before the first snapshot invoke', async () => {
+  it('subscribes once to history and queue changes before taking the snapshot', async () => {
     mockInvoke(1)
     renderNavItem()
     await screen.findByTestId('notification-badge')
@@ -424,6 +495,8 @@ describe('<NotificationsNavItem>', () => {
     vi.useFakeTimers()
     let unreadCountCalls = 0
     vi.mocked(transport.invoke).mockImplementation(async (ch: string) => {
+      if (ch === Queries.ListPendingMediaNotificationTaskIds) return []
+      if (ch === Queries.ListPendingMediaSelections) return []
       if (ch === Queries.ListNotifications) return []
       if (ch === Queries.GetUnreadNotificationCount) {
         unreadCountCalls += 1
@@ -456,6 +529,8 @@ describe('<NotificationsNavItem>', () => {
   it('F7: re-snapshots on transport reconnect and on window focus', async () => {
     let count = 4
     vi.mocked(transport.invoke).mockImplementation(async (ch: string) => {
+      if (ch === Queries.ListPendingMediaNotificationTaskIds) return []
+      if (ch === Queries.ListPendingMediaSelections) return []
       if (ch === Queries.ListNotifications) return []
       if (ch === Queries.GetUnreadNotificationCount) return count
       return undefined

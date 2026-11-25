@@ -621,6 +621,44 @@ describe('buildServerQueryHandlers — notification center', () => {
       handlers[Queries.GetUnreadNotificationCount]?.()
     ).resolves.toBe(1)
   })
+
+  it('lists all media notification task IDs independently of read state and pagination', async () => {
+    const expected = []
+    for (let index = 0; index < 110; index++) {
+      const taskId = `pending-${index}`
+      expected.push(taskId)
+      notificationCenter.notify({
+        sourceKey: taskId,
+        kind: 'media-selection-required',
+        severity: 'warning',
+        titleKey: 'title',
+        taskId,
+      })
+    }
+    notificationCenter.markAllRead()
+    notificationCenter.notify({
+      sourceKey: 'no-task',
+      kind: 'media-selection-required',
+      severity: 'warning',
+      titleKey: 'title',
+    })
+    notificationCenter.notify({
+      sourceKey: 'ordinary',
+      kind: 'task-error',
+      severity: 'error',
+      titleKey: 'title',
+      taskId: 'ordinary-task',
+    })
+    const handlers = buildServerQueryHandlers(
+      makeCtx({ notificationCenter }) as unknown as ServerQueryContext
+    )
+    await expect(handlers[Queries.ListNotifications]?.()).resolves.toHaveLength(
+      100
+    )
+    await expect(
+      handlers[Queries.ListPendingMediaNotificationTaskIds]?.()
+    ).resolves.toEqual(expected.sort())
+  })
 })
 
 describe('buildServerQueryHandlers — plugin grants', () => {

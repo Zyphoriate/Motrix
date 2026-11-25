@@ -1,5 +1,4 @@
 import type { NotificationCenter } from '@core/notifications/notification-center'
-import type { PendingMediaSelectionService } from '@core/plugin/pending-media-selection-service'
 import { Commands } from '@shared/protocol/commands'
 import type { Handler } from '@shared/protocol/handler-types'
 import { Queries } from '@shared/protocol/queries'
@@ -10,19 +9,13 @@ export interface NotificationIpcDeps {
   notificationCenter: Pick<
     NotificationCenter,
     | 'list'
-    | 'get'
+    | 'listPendingMediaNotificationTaskIds'
     | 'unreadCount'
     | 'markRead'
     | 'markAllRead'
     | 'delete'
     | 'clear'
     | 'clearOrdinary'
-    | 'snapshotIds'
-    | 'clearSnapshot'
-  >
-  getPendingMediaSelection?: () => Pick<
-    PendingMediaSelectionService,
-    'list' | 'cancel'
   >
   trackAsyncWork?: <T>(operation: () => Promise<T>) => Promise<T>
 }
@@ -34,29 +27,17 @@ export function buildNotificationHandlers(
 
   return {
     [Queries.ListNotifications]: async () => notificationCenter.list(),
+    [Queries.ListPendingMediaNotificationTaskIds]: async () =>
+      notificationCenter.listPendingMediaNotificationTaskIds(),
     [Queries.GetUnreadNotificationCount]: async () =>
       notificationCenter.unreadCount(),
     [Commands.MarkNotificationRead]: async (id: string) =>
       notificationCenter.markRead(id),
     [Commands.MarkAllNotificationsRead]: async () =>
       notificationCenter.markAllRead(),
-    [Commands.DeleteNotification]: async (id: string) => {
-      const notification = notificationCenter.get(id)
-      if (
-        notification?.kind === 'media-selection-required' &&
-        notification.taskId
-      )
-        await deps.getPendingMediaSelection?.().cancel(notification.taskId)
-      return notificationCenter.delete(id)
-    },
-    [Commands.ClearNotifications]: async () => {
-      const pending = deps.getPendingMediaSelection?.()
-      const selections = pending?.list() ?? []
-      const notificationIds = notificationCenter.snapshotIds()
-      for (const selection of selections)
-        await pending?.cancel(selection.taskId)
-      return notificationCenter.clearSnapshot(notificationIds)
-    },
+    [Commands.DeleteNotification]: async (id: string) =>
+      notificationCenter.delete(id),
+    [Commands.ClearNotifications]: async () => notificationCenter.clear(),
     [Commands.ClearOrdinaryNotifications]: async () =>
       notificationCenter.clearOrdinary(),
   }

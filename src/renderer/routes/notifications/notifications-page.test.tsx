@@ -640,9 +640,9 @@ describe('<NotificationsPage>', () => {
     )
   })
 
-  it('clears history through one backend command and refreshes the pending queue', async () => {
+  it('clears history through one backend command and preserves the pending queue', async () => {
     const requestId = 'e41039c7-34c9-49c6-82e1-057e109fe5f7'
-    let pending = [
+    const pending = [
       {
         requestId,
         taskId: requestId,
@@ -665,7 +665,6 @@ describe('<NotificationsPage>', () => {
     vi.mocked(transport.invoke).mockImplementation(async (channel, ...args) => {
       if (channel === Commands.ClearNotifications) {
         items = []
-        pending = []
         return
       }
       if (channel === Queries.ListNotifications) return items
@@ -692,12 +691,13 @@ describe('<NotificationsPage>', () => {
         .mock.calls.filter(
           ([channel]) => channel === Queries.ListPendingMediaSelections
         ).length
-    ).toBeGreaterThan(pendingReads)
+    ).toBe(pendingReads)
+    expect(pending).toHaveLength(1)
   })
 
-  it('refreshes pending selections after deleting a selection notification', async () => {
+  it('deletes a selection notification while preserving the pending queue', async () => {
     const requestId = 'e41039c7-34c9-49c6-82e1-057e109fe5f7'
-    let pending = [
+    const pending = [
       {
         requestId,
         taskId: requestId,
@@ -715,7 +715,6 @@ describe('<NotificationsPage>', () => {
     vi.mocked(transport.invoke).mockImplementation(async (channel, ...args) => {
       if (channel === Commands.DeleteNotification) {
         items = []
-        pending = []
         return
       }
       if (channel === Queries.ListNotifications) return items
@@ -743,7 +742,8 @@ describe('<NotificationsPage>', () => {
         .mock.calls.filter(
           ([channel]) => channel === Queries.ListPendingMediaSelections
         ).length
-    ).toBeGreaterThan(pendingReads)
+    ).toBe(pendingReads)
+    expect(pending).toHaveLength(1)
     expect(transport.invoke).not.toHaveBeenCalledWith(
       Commands.CancelPendingMediaSelection,
       expect.anything()
