@@ -1334,23 +1334,10 @@ export function buildServerCommandHandlers(
     [Commands.MarkAllNotificationsRead]: async () =>
       notificationCenter.markAllRead(),
 
-    [Commands.DeleteNotification]: async (id: string) => {
-      const notification = notificationCenter.get(id)
-      if (
-        notification?.kind === 'media-selection-required' &&
-        notification.taskId
-      )
-        await getPendingMediaSelection().cancel(notification.taskId)
-      return notificationCenter.delete(id)
-    },
+    [Commands.DeleteNotification]: async (id: string) =>
+      notificationCenter.delete(id),
 
-    [Commands.ClearNotifications]: async () => {
-      const pending = getPendingMediaSelection()
-      const selections = pending.list()
-      const notificationIds = notificationCenter.snapshotIds()
-      for (const selection of selections) await pending.cancel(selection.taskId)
-      return notificationCenter.clearSnapshot(notificationIds)
-    },
+    [Commands.ClearNotifications]: async () => notificationCenter.clear(),
 
     [Commands.ClearOrdinaryNotifications]: async () =>
       notificationCenter.clearOrdinary(),

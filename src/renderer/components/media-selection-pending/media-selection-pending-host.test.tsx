@@ -164,6 +164,41 @@ describe('pending media global host', () => {
     await screen.findByText('Selection online')
   })
 
+  it.each([Commands.ClearNotifications, Commands.DeleteNotification])(
+    'keeps the task picker available after %s removes its notification',
+    async (command) => {
+      const requestId = '00000000-0000-4000-8000-000000000002'
+      mocks.pending = [requestId]
+      const original = vi.mocked(transport.invoke).getMockImplementation()!
+      vi.mocked(transport.invoke).mockImplementation(
+        async (channel, ...args) => {
+          if (channel === command) {
+            mocks.events.get(Events.NotificationsChanged)?.()
+            return
+          }
+          return original(channel, ...args)
+        }
+      )
+      render(<MediaSelectionPendingHost />)
+      await act(async () => {})
+      await act(async () => {
+        await transport.invoke(command, 'notification-id')
+      })
+      expect(screen.queryByRole('dialog')).toBeNull()
+      expect(mocks.pending).toEqual([requestId])
+      act(() => requestPendingMediaSelection(requestId))
+      await screen.findByText('Selection online')
+      await act(async () => {
+        await transport.invoke(command, 'notification-id')
+      })
+      expect(screen.getByRole('dialog')).toBeTruthy()
+      expect(transport.invoke).not.toHaveBeenCalledWith(
+        Commands.CancelPendingMediaSelection,
+        expect.anything()
+      )
+    }
+  )
+
   it('waits for AddTaskForm and other active dialogs before opening', async () => {
     useAddTaskDialogStore.setState({ open: true })
     mocks.pending = ['00000000-0000-4000-8000-000000000003']

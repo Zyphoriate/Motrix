@@ -97,6 +97,9 @@ export const Queries = {
   // Notifications
   // ListNotifications returns AppNotification[] (latest 100, createdAt desc).
   ListNotifications: 'query:listNotifications',
+  // All media-selection-required notification task IDs, including read rows.
+  ListPendingMediaNotificationTaskIds:
+    'query:listPendingMediaNotificationTaskIds',
   // GetUnreadNotificationCount returns the unread badge count as a number.
   GetUnreadNotificationCount: 'query:getUnreadNotificationCount',
   GetCliToolStatus: 'query:getCliToolStatus',

@@ -7,23 +7,24 @@ import { cn } from '@renderer/lib/utils'
 import { useTranslation } from 'react-i18next'
 import { NavLink } from 'react-router'
 import { useNotifications } from './use-notifications'
-import { usePendingMediaSelections } from './use-pending-media-selections'
 
 const UNREAD_DISPLAY_CAP = 99
 
 /**
- * Notification history uses a count-only mirror. The independent pending queue
- * takes badge priority until its action is resolved or its notification is deleted.
+ * Pending selections with retained notifications take badge priority, including
+ * read notifications. Clearing history leaves the queue available in Downloads.
  */
 export function NotificationsNavItem() {
   const { t } = useTranslation()
-  const { unreadCount, badgeStyle } = useNotifications({ countOnly: true })
-  const { items: pendingSelections } = usePendingMediaSelections()
-  const hasPending = pendingSelections.length > 0
-  const displayCount = hasPending ? pendingSelections.length : unreadCount
+  const { unreadCount, badgeStyle, pendingNotificationCount } =
+    useNotifications({
+      countOnly: true,
+    })
+  const hasPending = pendingNotificationCount > 0
+  const displayCount = hasPending ? pendingNotificationCount : unreadCount
   const effectiveStyle = hasPending ? 'count' : badgeStyle
   const badgeAria = hasPending
-    ? t('mediaSelection.pending.badgeAria', { total: pendingSelections.length })
+    ? t('mediaSelection.pending.badgeAria', { total: pendingNotificationCount })
     : t('notification.center.unreadBadgeAria', { count: unreadCount })
   const badgeLabel =
     displayCount > UNREAD_DISPLAY_CAP

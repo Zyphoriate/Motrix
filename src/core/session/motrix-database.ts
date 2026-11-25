@@ -1304,21 +1304,15 @@ export class MotrixDatabase {
     return this.stmtDeleteNotification.run(id).changes > 0
   }
 
-  snapshotNotificationIds(hiddenKinds: readonly string[] = []): string[] {
+  listPendingMediaNotificationTaskIds(): string[] {
     const rows = this.db
       .prepare(
-        'SELECT id FROM notifications WHERE kind NOT IN (SELECT value FROM json_each(?))'
+        `SELECT DISTINCT task_id FROM notifications
+         WHERE kind = 'media-selection-required' AND task_id IS NOT NULL
+         ORDER BY task_id`
       )
-      .all(JSON.stringify(hiddenKinds)) as { id: string }[]
-    return rows.map((row) => row.id)
-  }
-
-  clearNotificationSnapshot(ids: readonly string[]): number {
-    return this.db
-      .prepare(
-        'DELETE FROM notifications WHERE id IN (SELECT value FROM json_each(?))'
-      )
-      .run(JSON.stringify(ids)).changes
+      .all() as { task_id: string }[]
+    return rows.map((row) => row.task_id)
   }
 
   /** Display table only — the ledger (`notification_occurrences`) is

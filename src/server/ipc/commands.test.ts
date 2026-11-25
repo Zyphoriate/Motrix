@@ -2408,118 +2408,49 @@ describe('buildServerCommandHandlers — notification center', () => {
   })
 })
 
-describe('server notification media cancellation', () => {
-  it('awaits real pending service cancellation and retains rows when it fails', async () => {
-    const db = new MotrixDatabase(':memory:')
-    db.init()
-    try {
-      const notificationCenter = new NotificationCenter({
-        store: db,
-        emit: vi.fn(),
-        log: { warn: vi.fn(), error: vi.fn() },
-      })
-      notificationCenter.notify({
-        sourceKey: 'pending',
-        kind: 'media-selection-required',
-        severity: 'warning',
-        titleKey: 'title',
-        taskId: 'pending-task',
-      })
-      const row = notificationCenter.list()[0]
-      const cancel = vi
-        .fn()
-        .mockRejectedValueOnce(new Error('cancel failed'))
-        .mockResolvedValue(undefined)
-      const list = vi
-        .fn()
-        .mockReturnValue([
-          { taskId: 'pending-task' },
-          { taskId: 'unlisted-task' },
-        ])
-      const handlers = buildServerCommandHandlers({
-        ...makeFakeCtx(),
-        notificationCenter,
-        motrixDatabase: db,
-        onMediaSelectionReady: (
-          _media: unknown,
-          pending: PendingMediaSelectionService
-        ) => {
-          vi.spyOn(pending, 'cancel').mockImplementation(cancel)
-          vi.spyOn(pending, 'list').mockImplementation(list)
-        },
-      } as unknown as ServerCommandContext)
-      await expect(
-        handlers[Commands.DeleteNotification]?.(row.id)
-      ).rejects.toThrow('cancel failed')
-      expect(notificationCenter.get(row.id)).not.toBeNull()
-      await expect(handlers[Commands.ClearNotifications]?.()).resolves.toBe(1)
-      expect(cancel.mock.calls.map(([id]) => id)).toEqual([
-        'pending-task',
-        'pending-task',
-        'unlisted-task',
-      ])
-      expect(notificationCenter.list()).toEqual([])
-    } finally {
-      db.close()
-    }
-  })
-
-  it('preserves new choices while clearing the complete initial notification snapshot', async () => {
-    const db = new MotrixDatabase(':memory:')
-    db.init()
-    try {
-      const notificationCenter = new NotificationCenter({
-        store: db,
-        emit: vi.fn(),
-        log: { warn: vi.fn(), error: vi.fn() },
-      })
-      for (let index = 0; index < 110; index++)
-        notificationCenter.notify({
-          sourceKey: `initial-${index}`,
-          kind: 'task-error',
-          severity: 'error',
-          titleKey: 'title',
+describe('server notification media retention', () => {
+  it.each([Commands.DeleteNotification, Commands.ClearNotifications])(
+    '%s leaves pending services untouched',
+    async (command) => {
+      const db = new MotrixDatabase(':memory:')
+      db.init()
+      try {
+        const notificationCenter = new NotificationCenter({
+          store: db,
+          emit: vi.fn(),
+          log: { warn: vi.fn(), error: vi.fn() },
         })
-      let finish!: () => void
-      const waiting = new Promise<void>((resolve) => {
-        finish = resolve
-      })
-      const selections = [{ taskId: 'initial-choice' }]
-      const cancel = vi.fn(async () => waiting)
-      const handlers = buildServerCommandHandlers({
-        ...makeFakeCtx(),
-        notificationCenter,
-        motrixDatabase: db,
-        onMediaSelectionReady: (
-          _media: unknown,
-          pending: PendingMediaSelectionService
-        ) => {
-          vi.spyOn(pending, 'cancel').mockImplementation(cancel)
-          vi.spyOn(pending, 'list').mockImplementation(
-            () => [...selections] as ReturnType<typeof pending.list>
-          )
-        },
-      } as unknown as ServerCommandContext)
-      const clearing = handlers[Commands.ClearNotifications]?.()
-      expect(cancel).toHaveBeenCalledWith('initial-choice')
-      selections.push({ taskId: 'new-choice' })
-      notificationCenter.notify({
-        sourceKey: 'new-choice',
-        kind: 'media-selection-required',
-        severity: 'warning',
-        titleKey: 'title',
-        taskId: 'new-choice',
-      })
-      finish()
-      await expect(clearing).resolves.toBe(110)
-      expect(cancel).toHaveBeenCalledTimes(1)
-      expect(notificationCenter.list()).toEqual([
-        expect.objectContaining({ taskId: 'new-choice' }),
-      ])
-    } finally {
-      db.close()
+        notificationCenter.notify({
+          sourceKey: 'pending',
+          kind: 'media-selection-required',
+          severity: 'warning',
+          titleKey: 'title',
+          taskId: 'pending-task',
+        })
+        const row = notificationCenter.list()[0]
+        const cancel = vi.fn()
+        const list = vi.fn()
+        const handlers = buildServerCommandHandlers({
+          ...makeFakeCtx(),
+          notificationCenter,
+          motrixDatabase: db,
+          onMediaSelectionReady: (
+            _media: unknown,
+            pending: PendingMediaSelectionService
+          ) => {
+            vi.spyOn(pending, 'cancel').mockImplementation(cancel)
+            vi.spyOn(pending, 'list').mockImplementation(list)
+          },
+        } as unknown as ServerCommandContext)
+        await handlers[command]?.(row.id)
+        expect(notificationCenter.list()).toEqual([])
+        expect(cancel).not.toHaveBeenCalled()
+        expect(list).not.toHaveBeenCalled()
+      } finally {
+        db.close()
+      }
     }
-  })
+  )
 
   it('clears ordinary read and unread notifications while keeping pending choices', async () => {
     const db = new MotrixDatabase(':memory:')
